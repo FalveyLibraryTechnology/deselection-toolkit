@@ -339,7 +339,6 @@ def create_department_graph(weeding_barcodes, books, month):
                 "retain": 0,
                 "personal": 0,
             }
-        department_counts[department]["total"] += 1
         department_counts[department]["retain"] += 1
         if record["for_personal"]:
             department_counts[department]["personal"] += 1
