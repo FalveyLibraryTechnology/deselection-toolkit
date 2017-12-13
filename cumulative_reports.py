@@ -97,9 +97,13 @@ def parse_crtf_dir(reports_dir):
             month_data = json.load(jsonFile)
     return month_data
 
-retained_with_duplicates = []
-def parseForm(row, month):
-    global all_retained_books, all_faculty
+all_faculty = {}        # Faculty data
+all_book_requests = []  # All book requests with data
+all_effective = {}      # Full book data
+def parse_form(row, month):
+    global all_retained_books, all_faculty, effective_by_month, effective_personal, effective_retained
+
+    log_barcodes = [] # Barcodes
 
     date = row[0]
     form = row[4]
@@ -122,58 +126,51 @@ def parseForm(row, month):
         current += 1
     faculty['address'] = lines[current + 1]
 
+    if faculty["name"] in all_faculty:
+        # Update address
+        if len(faculty["address"]) > len(all_faculty[faculty["name"]]["address"]):
+            all_faculty[faculty["name"]]["address"] = faculty["address"]
+        # Update department
+        if len(faculty["department"]) > len(all_faculty[faculty["name"]]["department"]):
+            all_faculty[faculty["name"]]["department"] = faculty["department"]
+    else:
+        all_faculty[faculty["name"]] = faculty
+
     book_submissions = form.split('Barcode:\n')[1:]
-    books = {}
-    faculty_list = []
-    personal_list = []
-    overridden = []
     for bt in book_submissions:
         bc = 0
         blines = bt.split('\n')
         barcode = blines[0].strip()
-        b = {
+
+        if not barcode in weeding_data_books:
+            print ("missing barcode: %s (%s, %s)" % (barcode, faculty["name"], faculty["department"]))
+            continue
+        log_barcodes.append(barcode)
+
+        book = {
             "date": date,
             "faculty": faculty["name"],
             "month": month,
         }
 
-        # Get title from master list
-        # while blines[bc] != 'Title:':
-        #     bc += 1
-        # b['title'] = blines[bc + 1].strip()
-
         while blines[bc] != 'Destination:':
             # print (bc, len(blines), blines[bc])
             bc += 1
-        b["for_personal"] = blines[bc + 1].strip() == 'Patron'
-        # Check if book already retained for collection
-        if barcode in all_retained_books and not all_retained_books[barcode]["for_personal"]:
-            # print ("Overridden by Collection: %s" % barcode)
-            if not barcode in overridden:
-                overridden.append(barcode)
-        elif b["for_personal"]:
-            personal_list.append(barcode)
+        book["for_personal"] = blines[bc + 1].strip() == 'Patron'
 
         while blines[bc] != 'Comment:':
             bc += 1
-        b['comment'] = '\n'.join(blines[bc + 1:]).strip()
+        book['comment'] = '\n'.join(blines[bc + 1:]).strip()
 
-        # Personal collection overridden
-        faculty_list.append(barcode)
-        for name in all_faculty:
-            if barcode in all_faculty[name]["personal"]:
-                all_faculty[name]["personal"].remove(barcode)
-                if not barcode in overridden:
-                    overridden.append(barcode)
-                # print ("Overridden by Earlier Claim: %s" % barcode)
-        books[barcode] = b
-        b["barcode"] = barcode
-        retained_with_duplicates.append(b)
+        book.update(weeding_data_books[barcode])
 
-    faculty["books"] = faculty_list
-    faculty["personal"] = personal_list
+        # Check if book already retained for collection
+        if not barcode in all_effective:
+            all_effective[barcode] = book
+        elif not book["for_personal"]:
+            all_effective[barcode]["for_personal"] = False
 
-    return books, faculty, overridden
+    return log_barcodes
 
 def book_to_row_headers():
     return '"Callnumber","Barcode","Publication Year","Title","Author"'
@@ -186,94 +183,69 @@ def book_to_row(book):
         book["author"],
     )
 
-def create_retention_by_callnumber(retain_barcodes, month):
-    global all_faculty, all_retained_books, weeding_data_books
-    books = []
-    for barcode in retain_barcodes:
-        if barcode in weeding_data_books:
-            for name in all_faculty:
-                if barcode in all_faculty[name]["books"]:
-                    books.append(weeding_data_books[barcode])
-                    break
+def create_retention_by_callnumber(books, month):
     books.sort(key=lambda b: b["callnumber_sort"])
     with open('reports/%s/all-retention-by-callnumber.csv' % month, 'w', encoding="utf8") as outfile:
         outfile.write('%s,"%s","%s"\n' % (book_to_row_headers(),"Requesting Faculty","Destination"))
-        for b in books:
-            record = all_retained_books[b["barcode"]]
-            outfile.write('%s,"%s","%s"\n' % (book_to_row(b), record["faculty"], "Personal" if record["for_personal"] else "Retain"))
+        for record in books:
+            outfile.write('%s,"%s","%s"\n' % (book_to_row(record), record["faculty"], "Personal" if record["for_personal"] else "Retain"))
 
-def create_retention_by_faculty(retain_barcodes, month):
-    global all_faculty, weeding_data_books
+def create_retention_by_faculty(books, month):
+    last_name = ""
+    books.sort(key=lambda b: b["faculty"])
     with open('reports/%s/all-retention-by-faculty.csv' % month, 'w', encoding="utf8") as outfile:
-        for name in all_faculty:
-            faculty = all_faculty[name]
-            books = []
-            for barcode in faculty["books"]:
-                personal = barcode in faculty["personal"]
-                if barcode in retain_barcodes and barcode in weeding_data_books:
-                    books.append((weeding_data_books[barcode]["callnumber_sort"], (barcode, personal)))
-            books.sort(key=lambda b: b[0])
-            if len(books) > 0:
+        for record in books:
+            if last_name != record["faculty"]:
+                last_name = record["faculty"]
+                faculty = all_faculty[record["faculty"]]
                 outfile.write('"%s","%s","%s"\n' % (faculty["name"], faculty["department"], faculty["address"]))
-                for book in books:
-                    barcode, personal = book[1]
-                    outfile.write(',"%s",%s\n' % ("Personal" if personal else "Retain", book_to_row(weeding_data_books[barcode])))
+            outfile.write(',"%s",%s\n' % ("Personal" if record["for_personal"] else "Retain", book_to_row(record)))
 
-def create_personal_by_callnumber(retain_barcodes, month):
-    global all_faculty, all_retained_books, weeding_data_books
-
-    books = []
-    for barcode in retain_barcodes:
-        for name in all_faculty:
-            if barcode in all_faculty[name]["personal"]:
-                books.append(weeding_data_books[barcode])
+def create_personal_by_callnumber(books, month):
+    personal = [b for b in books if b["for_personal"]]
     books.sort(key=lambda b: b["callnumber_sort"])
     with open('reports/%s/for-personal-collections-by-callnumber.csv' % month, 'w', encoding="utf8") as outfile:
         outfile.write('%s,"Requesting Faculty","Campus Address"\n' % book_to_row_headers())
-        for b in books:
-            record = all_retained_books[b["barcode"]]
-            outfile.write('%s,"%s","%s"\n' % (book_to_row(b), record["faculty"], all_faculty[record["faculty"]]["address"]))
+        for record in personal:
+            outfile.write('%s,"%s","%s"\n' % (book_to_row(record), record["faculty"], all_faculty[record["faculty"]]["address"]))
 
-def create_personal_by_faculty(retain_barcodes, month):
-    global all_faculty, all_retained_books, weeding_data_books
+def create_personal_by_faculty(books, month):
+    last_name = ""
+    personal = [b for b in books if b["for_personal"]]
+    personal.sort(key=lambda b: b["faculty"])
     with open('reports/%s/for-personal-collections-by-faculty.csv' % month, 'w', encoding="utf8") as outfile:
-        for name in all_faculty:
-            faculty = all_faculty[name]
-            books = []
-            for barcode in faculty["personal"]:
-                if barcode in retain_barcodes and barcode in weeding_data_books:
-                    books.append(weeding_data_books[barcode])
-            books.sort(key=lambda b: b["callnumber_sort"])
-            if len(books) > 0:
+        for record in personal:
+            if last_name != record["faculty"]:
+                last_name = record["faculty"]
+                faculty = all_faculty[record["faculty"]]
                 outfile.write('"%s","%s","%s"\n' % (faculty["name"], faculty["department"], faculty["address"]))
-                for b in books:
-                    record = all_retained_books[b["barcode"]]
-                    outfile.write(',%s\n' % (book_to_row(b)))
+            outfile.write(',"%s",%s\n' % ("Personal" if record["for_personal"] else "Retain", book_to_row(record)))
 
-def create_emails(retain_barcodes, month):
-    global all_faculty, all_retained_books, weeding_data_books
-
+def create_emails(books, month):
     faculty_emails = {}
-    for barcode in retain_barcodes:
-        if barcode in all_retained_books:
-            book = all_retained_books[barcode]
-            if len(all_faculty[book["faculty"]]["personal"]) > 0:
-                if not book["faculty"] in faculty_emails:
-                    faculty_emails[book["faculty"]] = {
-                        "theirs": [],
-                        "in_library": [],
-                        "too_late": [],
-                    }
-                if barcode in all_faculty[book["faculty"]]["personal"]:
-                    faculty_emails[book["faculty"]]["theirs"].append(weeding_data_books[barcode]["title"])
-                elif book["for_personal"]:
-                    faculty_emails[book["faculty"]]["too_late"].append(weeding_data_books[barcode]["title"])
-                else:
-                    faculty_emails[book["faculty"]]["in_library"].append(weeding_data_books[barcode]["title"])
+    for record in books:
+        if not record["faculty"] in faculty_emails:
+            faculty_emails[record["faculty"]] = {
+                "theirs": [],
+                "in_library": [],
+                "too_late": [],
+            }
+        if record["for_personal"]:
+            for i in all_book_requests:
+                if record["barcode"] == all_book_requests[i]["barcode"]:
+                    if record["faculty"] == all_book_requests[i]["faculty"]:
+                        faculty_emails[record["faculty"]]["theirs"].append(record["title"])
+                    else:
+                        faculty_emails[record["faculty"]]["too_late"].append(record["title"])
+        else:
+            faculty_emails[record["faculty"]]["in_library"].append(record["title"])
+
     with open('reports/%s/personal-retention-emails.csv' % month, 'w', encoding="utf8") as outfile:
         writer = csv.writer(outfile)
         writer.writerow(["Faculty", "Department", "Email"])
         for name in faculty_emails:
+            if len(faculty_emails[name]["theirs"]) == 0:
+                continue
             faculty = faculty_emails[name]
             receiving = ""
             if len(faculty["theirs"]) > 0:
@@ -301,24 +273,20 @@ def create_emails(retain_barcodes, month):
 Stay sexy, don't get murdered,
 """ % (name, receiving, staying, other)])
 
-def create_master_list(month_barcodes, retain_barcodes, month):
-    global weeding_data_books
+def create_master_list(month_barcodes, month):
+    global weeding_data_books, weeding_data_by_month
 
-    # Filter for unique
-    month_barcodes = make_unique(month_barcodes)
-    retain_barcodes = make_unique(retain_barcodes)
+    master_barcodes = weeding_data_by_month[month][:]
 
-    master_list = []
     for barcode in month_barcodes:
-        if not barcode in retain_barcodes:
-            master_list.append(weeding_data_books[barcode])
-    master_list.sort(key=lambda b: b["callnumber_sort"])
+        if barcode in master_barcodes:
+            master_barcodes.remove(barcode)
     print ("%s master list: %d - %d = %d === %d" % (
         month,
+        len(weeding_data_by_month[month]),
         len(month_barcodes),
-        len(retain_barcodes),
-        len(month_barcodes) - len(retain_barcodes),
-        len(master_list),
+        len(weeding_data_by_month[month]) - len(month_barcodes),
+        len(master_barcodes),
     ))
 
     # Check logs for barcodes
@@ -333,43 +301,48 @@ def create_master_list(month_barcodes, retain_barcodes, month):
         for log in log_files:
             log_file_text += open("sources/%s" % log).read()
     if len(log_file_text) > 0:
-        for book in master_list:
-            if book["barcode"] in log_file_text:
-                print("\t\tERROR: %s" % book["barcode"])
+        for barcode in master_barcodes:
+            if barcode in log_file_text:
+                print("\t\tERROR: %s" % barcode)
+                master_barcodes.remove(barcode)
 
+    master_list = [weeding_data_books[b] for b in master_barcodes]
+    master_list.sort(key=lambda b: b["callnumber_sort"])
     with open('reports/%s/master-pull-list.csv' % month, 'w', encoding="utf8") as outfile:
         outfile.write('%s,"Action Taken"\n' % book_to_row_headers())
         for b in master_list:
             outfile.write('%s,\n' % book_to_row(b))
 
-def create_department_graph(month_barcodes, retain_barcodes, month):
-    global all_faculty, all_retained_books, department_counts, weeding_data_books
+def create_department_graph(weeding_barcodes, books, month):
+    global weeding_data_by_month
 
     department_counts = {}
-    for barcode in month_barcodes:
+    for barcode in weeding_barcodes:
         dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
         department = dept_match.group(1)
         if not department in department_counts:
             department_counts[department] = {
                 "name": department,
-                "total": 1,
+                "total": 0,
                 "retain": 0,
                 "personal": 0,
             }
-        else:
-            department_counts[department]["total"] += 1
+        department_counts[department]["total"] += 1
 
-    for barcode in retain_barcodes:
-        if not barcode in weeding_data_books or not barcode in all_retained_books:
-            continue
-        dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
+    for record in books:
+        dept_match = re.search('^([A-Z]+)', record["callnumber"])
         department = dept_match.group(1)
-        for name in all_faculty:
-            if barcode in all_faculty[name]["books"]:
-                department_counts[department]["retain"] += 1
-            if barcode in all_faculty[name]["personal"]:
-                department_counts[department]["retain"] += 1
-                department_counts[department]["personal"] += 1
+        if not department in department_counts:
+            department_counts[department] = {
+                "name": department,
+                "total": 0,
+                "retain": 0,
+                "personal": 0,
+            }
+        department_counts[department]["total"] += 1
+        department_counts[department]["retain"] += 1
+        if record["for_personal"]:
+            department_counts[department]["personal"] += 1
 
     department_bars = []
     for department in department_counts:
@@ -426,23 +399,27 @@ def create_department_graph(month_barcodes, retain_barcodes, month):
         title=month
     )
 
-def create_faculty_graph(retain_barcodes, month):
-    global all_faculty, all_retained_books
+def create_faculty_graph(books, month):
+    books.sort(key=lambda b: b["faculty"])
 
-    added_names = []
-    for barcode in retain_barcodes:
-        if not barcode in all_retained_books:
-            continue
-        name = all_retained_books[barcode]["faculty"]
-        if not name in added_names:
-            added_names.append(name)
+    faculty = {}
+    for record in books:
+        if not record["faculty"] in faculty:
+            faculty[record["faculty"]] = {
+                "total": 0,
+                "personal": 0,
+            }
+        faculty[record["faculty"]]["total"] += 1
+        if record["for_personal"]:
+            faculty[record["faculty"]]["personal"] += 1
+
     sorted_faculty = []
-    for name in added_names:
+    for name in faculty:
         sorted_faculty.append({
             "name": all_faculty[name]["name"],
             "department": all_faculty[name]["department"],
-            "books": len(all_faculty[name]["books"]),
-            "personal": len(list(filter(lambda b: b in all_faculty[name]["personal"], all_faculty[name]["books"]))),
+            "books": faculty[name]["total"],
+            "personal": faculty[name]["personal"],
         })
     sorted_faculty.sort(key=lambda f: f["books"], reverse=True)
 
@@ -456,34 +433,29 @@ def create_faculty_graph(retain_barcodes, month):
         ])
     bar_graph(
         "reports/%s/faculty.png" % month, faculty_bars,
-        key=["Total Requested", "Requested for Personal"],
+        key=["Total Retained", "Retained for Personal"],
         labels=faculty_labels,
         title=month
     )
 
-def callnumber_breakdowns(month_barcodes, retain_barcodes, folder):
-    global all_retained_books, department_counts, weeding_data_books
+def callnumber_breakdowns(folder):
+    global all_effective
 
     department_counts = {}
-    for barcode in month_barcodes:
+    for barcode in all_effective:
         dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
         department = dept_match.group(1)
         if not department in department_counts:
             department_counts[department] = {
                 "name": department,
-                "total": 1,
+                "total": 0,
                 "retain": 0,
                 "personal": 0,
             }
-        else:
-            department_counts[department]["total"] += 1
-
-    for barcode in retain_barcodes:
-        if not barcode in weeding_data_books or not barcode in all_retained_books:
-            continue
-        dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
-        department = dept_match.group(1)
-        if all_retained_books[barcode]["for_personal"]:
+        department_counts[department]["total"] += 1
+        record = all_effective[barcode]
+        department_counts[department]["total"] += 1
+        if record["for_personal"]:
             department_counts[department]["personal"] += 1
         else:
             department_counts[department]["retain"] += 1
@@ -733,97 +705,80 @@ for dir in weeding_dirs:
     weeding_data_books.update(month_data)
     weeding_data_by_month[month] = make_unique(month_data.copy().keys())
 
-all_faculty = {}
-all_retained_books = {}
-retention_by_month = {}
 print ("Log Files")
 log_files = [file.name for file in os.scandir("sources/") if file.is_file()]
 for log in log_files:
     month = log.split("-")[0]
-    retention_by_month[month] = []
+    month_barcodes = []
     print ("\t%s" % month)
 
     header = True
     file = csv.reader(open("sources/%s" % log))
-    month_overridden = 0
     for row in file:
         if header:
             header = False
             continue
         # date = datetime.datetime.strptime(row[0], '%b %d, %Y, %I:%M:%S %p')
-        books, faculty, overridden = parseForm(row, month)
-        month_overridden += len(overridden)
-        for barcode in books:
-            if barcode in weeding_data_books:
-                all_retained_books[barcode] = books[barcode]
-            else:
-                print ("missing barcode: %s (%s, %s)" % (barcode, faculty["name"], faculty["department"]))
-        retention_by_month[month].extend(books.keys())
-        if faculty["name"] in all_faculty:
-            # Update address
-            if len(faculty["address"]) > len(all_faculty[faculty["name"]]["address"]):
-                all_faculty[faculty["name"]]["address"] = faculty["address"]
-            # Update department
-            if len(faculty["department"]) > len(all_faculty[faculty["name"]]["department"]):
-                all_faculty[faculty["name"]]["department"] = faculty["department"]
-            all_faculty[faculty["name"]]["books"].extend(faculty["books"])
-        else:
-            all_faculty[faculty["name"]] = faculty
-    retention_by_month[month] = make_unique(retention_by_month[month])
-    print ("\t\tOverridden: %d" % month_overridden)
+        month_barcodes.extend(parse_form(row, month))
+    month_barcodes = make_unique(month_barcodes)
 
-for month in retention_by_month:
+    month_books = []
+    for barcode in month_barcodes:
+        month_books.append(dict(all_effective[barcode]))
+
     if not os.path.exists('reports/%s' % month):
         os.mkdir('reports/%s' % month)
-    create_retention_by_callnumber(retention_by_month[month], month)
-    create_retention_by_faculty(retention_by_month[month], month)
-    create_personal_by_callnumber(retention_by_month[month], month)
-    create_personal_by_faculty(retention_by_month[month], month)
-    create_emails(retention_by_month[month], month)
+    create_retention_by_callnumber(month_books, month)
+    create_retention_by_faculty(month_books, month)
+    create_personal_by_callnumber(month_books, month)
+    create_personal_by_faculty(month_books, month)
+    create_emails(month_books, month)
     # Master list
-    create_master_list(weeding_data_by_month[month], retention_by_month[month], month)
+    create_master_list(month_barcodes, month)
     # Graphs
-    create_department_graph(weeding_data_by_month[month], retention_by_month[month], month)
-    create_faculty_graph(retention_by_month[month], month)
+    create_department_graph(weeding_data_by_month[month], month_books, month)
+    create_faculty_graph(month_books, month)
 
 # Cumulative Records
 cumulative_folder = "Since October 2017"
 if not os.path.exists('reports/%s' % cumulative_folder):
     os.mkdir('reports/%s' % cumulative_folder)
-all_retained_books_keys = all_retained_books.keys()
-create_retention_by_callnumber(all_retained_books_keys, cumulative_folder)
-create_retention_by_faculty(all_retained_books_keys, cumulative_folder)
-create_personal_by_callnumber(all_retained_books_keys, cumulative_folder)
-create_personal_by_faculty(all_retained_books_keys, cumulative_folder)
-# Master list
-# create_master_list(weeding_data_books.keys(), all_retained_books_keys, cumulative_folder)
+
+all_retained_books = []
+for barcode in all_effective:
+    all_retained_books.append(all_effective[barcode])
+# Reports
+create_retention_by_callnumber(all_retained_books, cumulative_folder)
+create_retention_by_faculty(all_retained_books, cumulative_folder)
+create_personal_by_callnumber(all_retained_books, cumulative_folder)
+create_personal_by_faculty(all_retained_books, cumulative_folder)
 # Graphs
-create_department_graph(weeding_data_books.keys(), all_retained_books_keys, cumulative_folder)
-create_faculty_graph(all_retained_books_keys, cumulative_folder)
+create_department_graph(weeding_data_books.keys(), all_retained_books, cumulative_folder)
+create_faculty_graph(all_retained_books, cumulative_folder)
 
 print ("\nGenerating callnumber breakdowns...")
-totals = callnumber_breakdowns(weeding_data_books.keys(), all_retained_books_keys, cumulative_folder)
+totals = callnumber_breakdowns(cumulative_folder)
 
 print ("\nExport all retention as json...")
 owner = {}
-retained_with_duplicates.sort(key=lambda x: datetime.datetime.strptime(x["date"], "%b %d, %Y, %I:%M:%S %p"))
-for i in range(len(retained_with_duplicates)):
-    book = retained_with_duplicates[i]
+all_book_requests.sort(key=lambda x: datetime.datetime.strptime(x["date"], "%b %d, %Y, %I:%M:%S %p"))
+for i in range(len(all_book_requests)):
+    book = all_book_requests[i]
     if not book["barcode"] in owner:
         owner[book["barcode"]] = i
         continue
     curr = owner[book["barcode"]]
-    if not book["for_personal"] and retained_with_duplicates[curr]["for_personal"]:
+    if not book["for_personal"] and all_book_requests[curr]["for_personal"]:
         owner[book["barcode"]] = i
-for i in range(len(retained_with_duplicates)):
-    book = retained_with_duplicates[i]
+for i in range(len(all_book_requests)):
+    book = all_book_requests[i]
     book["overridden"] = owner[book["barcode"]] != i
 
-retained_with_duplicates.sort(key=lambda x: x["barcode"])
-for book in retained_with_duplicates:
+all_book_requests.sort(key=lambda x: x["barcode"])
+for book in all_book_requests:
     if book["barcode"] in weeding_data_books:
         book.update(weeding_data_books[book["barcode"]])
         book["department"] = all_faculty[book["faculty"]]["department"]
         del book["faculty"]
-totals.update({ "retention": retained_with_duplicates })
+totals.update({ "retention": all_book_requests })
 json.dump(totals, open("retention_data.json", "w"), indent=4, sort_keys=True)
