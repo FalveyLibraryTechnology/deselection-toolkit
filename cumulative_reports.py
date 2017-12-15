@@ -753,7 +753,7 @@ for log in log_files:
     create_faculty_graph(month_books, month)
 
 # Cumulative Records
-cumulative_folder = "Since October 2017"
+cumulative_folder = "Cumulative"
 if not os.path.exists('reports/%s' % cumulative_folder):
     os.mkdir('reports/%s' % cumulative_folder)
 
