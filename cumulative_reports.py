@@ -773,6 +773,10 @@ print ("\nGenerating callnumber breakdowns...")
 totals = callnumber_breakdowns(cumulative_folder)
 
 print ("\nExport all retention as json...")
+all_book_requests = []
+for month in all_requests_by_month:
+    all_book_requests.extend(all_requests_by_month[month])
+
 owner = {}
 all_book_requests.sort(key=lambda x: datetime.datetime.strptime(x["date"], "%b %d, %Y, %I:%M:%S %p"))
 for i in range(len(all_book_requests)):
