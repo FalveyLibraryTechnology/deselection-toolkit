@@ -98,12 +98,13 @@ def parse_crtf_dir(reports_dir):
     return month_data
 
 all_faculty = {}        # Faculty data
-all_book_requests = []  # All book requests with data
+all_requests_by_month = {} # All book requests with data
 all_effective = {}      # Full book data
 def parse_form(row, month):
     global all_retained_books, all_faculty, effective_by_month, effective_personal, effective_retained
 
     log_barcodes = [] # Barcodes
+    all_requests = [] # Request data
 
     date = row[0]
     form = row[4]
@@ -162,6 +163,8 @@ def parse_form(row, month):
             bc += 1
         book['comment'] = '\n'.join(blines[bc + 1:]).strip()
 
+        all_requests.append(book)
+
         book.update(weeding_data_books[barcode])
 
         # Check if book already retained for collection
@@ -170,7 +173,7 @@ def parse_form(row, month):
         elif not book["for_personal"]:
             all_effective[barcode]["for_personal"] = False
 
-    return log_barcodes
+    return [log_barcodes, all_requests]
 
 def book_to_row_headers():
     return '"Callnumber","Barcode","Publication Year","Title","Author"'
@@ -219,37 +222,42 @@ def create_personal_by_faculty(books, month):
                 last_name = record["faculty"]
                 faculty = all_faculty[record["faculty"]]
                 outfile.write('"%s","%s","%s"\n' % (faculty["name"], faculty["department"], faculty["address"]))
-            outfile.write(',"%s",%s\n' % ("Personal" if record["for_personal"] else "Retain", book_to_row(record)))
+            outfile.write(',%s\n' % book_to_row(record))
 
 def create_emails(books, month):
+    global all_requests_by_month
     faculty_emails = {}
-    for record in books:
-        if not record["faculty"] in faculty_emails:
-            faculty_emails[record["faculty"]] = {
-                "theirs": [],
-                "in_library": [],
-                "too_late": [],
-            }
-        if record["for_personal"]:
-            for i in all_book_requests:
-                if record["barcode"] == all_book_requests[i]["barcode"]:
-                    if record["faculty"] == all_book_requests[i]["faculty"]:
-                        faculty_emails[record["faculty"]]["theirs"].append(record["title"])
+    for request in all_requests_by_month[month]:
+        if request["barcode"] in all_effective and request["for_personal"]:
+            if not request["faculty"] in faculty_emails:
+                faculty_emails[request["faculty"]] = {
+                    "theirs": [],
+                    "in_library": [],
+                    "too_late": [],
+                }
+            record = all_effective[request["barcode"]]
+            if record["barcode"] == request["barcode"]:
+                if record["for_personal"]:
+                    if record["faculty"] == request["faculty"]:
+                        faculty_emails[request["faculty"]]["theirs"].append(record["title"])
                     else:
-                        faculty_emails[record["faculty"]]["too_late"].append(record["title"])
-        else:
-            faculty_emails[record["faculty"]]["in_library"].append(record["title"])
+                        faculty_emails[request["faculty"]]["too_late"].append(record["title"])
+                else:
+                    faculty_emails[request["faculty"]]["in_library"].append(record["title"])
 
-    with open('reports/%s/personal-retention-emails.csv' % month, 'w', encoding="utf8") as outfile:
+    with open('reports/%s/personal-retention-emails.csv' % month, 'w', newline="", encoding="utf8") as outfile:
         writer = csv.writer(outfile)
         writer.writerow(["Faculty", "Department", "Email"])
         for name in faculty_emails:
-            if len(faculty_emails[name]["theirs"]) == 0:
-                continue
             faculty = faculty_emails[name]
+            # print (name, len(faculty["theirs"]))
+            if len(faculty["in_library"]) + len(faculty["theirs"]) + len(faculty["too_late"]) == 0:
+                continue
             receiving = ""
             if len(faculty["theirs"]) > 0:
-                receiving = "\n\nYou will be receiving the following books:\n\n - %s" % "\n - ".join(make_unique(faculty["theirs"]))
+                receiving = "You will be receiving the following books:\n\n - %s" % "\n - ".join(make_unique(faculty["theirs"]))
+            else:
+                receiving = "Unfortunately, all of the books you requested fell into one of these precedence categories."
             staying = ""
             if len(faculty["in_library"]) > 0:
                 staying = "\n\nThe following books you requested will be kept in the collection:\n\n - %s" % "\n - ".join(make_unique(faculty["in_library"]))
@@ -259,7 +267,7 @@ def create_emails(books, month):
                     if len(faculty["too_late"]) == 1:
                         other = "\n\nThe final book you requested was requested by another faculty member before you, so you will not be receiving this item."
                     else:
-                        other = "\n\nThe remaining %d books you requested were requested by another faculty member before you requested them, so you will not be receiving those items."
+                        other = "\n\nThe remaining %d books you requested were requested by another faculty member before you requested them, so you will not be receiving those items." % len(faculty["too_late"])
                 else:
                     if len(faculty["too_late"]) == 1:
                         other = "\n\nUnfortunately, the book you requested was requested by another faculty member before you, so we're sorry to say that you will not be receiving your requested item."
@@ -268,9 +276,12 @@ def create_emails(books, month):
             writer.writerow([name, all_faculty[name]["department"],
 """Dear %s,
 
-[These are the rules]%s%s%s
+We received your request to keep some of the deselected books for your own collection. This email is to inform you of the outcome of that request. We take a few things into consideration when we handle personal requests and these considerations may affect which of your requested items you receive. First, if anyone requested a book to stay in the library's collection, that will take precedence over a personal request. Also, personal requests are on a first come, first serve basis, so if someone requested one of the books you wanted before you did, the earlier request will take precedence.
 
-Stay sexy, don't get murdered,
+%s%s%s
+
+Best,
+[YOUR NAME HERE]
 """ % (name, receiving, staying, other)])
 
 def create_master_list(month_barcodes, month):
@@ -709,6 +720,7 @@ log_files = [file.name for file in os.scandir("sources/") if file.is_file()]
 for log in log_files:
     month = log.split("-")[0]
     month_barcodes = []
+    all_requests_by_month[month] = []
     print ("\t%s" % month)
 
     header = True
@@ -718,7 +730,9 @@ for log in log_files:
             header = False
             continue
         # date = datetime.datetime.strptime(row[0], '%b %d, %Y, %I:%M:%S %p')
-        month_barcodes.extend(parse_form(row, month))
+        barcodes, requests = parse_form(row, month)
+        month_barcodes.extend(barcodes)
+        all_requests_by_month[month].extend(requests)
     month_barcodes = make_unique(month_barcodes)
 
     month_books = []
