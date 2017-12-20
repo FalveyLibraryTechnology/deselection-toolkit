@@ -13,6 +13,9 @@ from ProgressBar import ProgressBar
 
 csv.field_size_limit(sys.maxsize)
 
+# Barcodes removed for being checked out
+CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("checked_out/barcodes_since_01Apr2017.txt").read().split("\n")]
+
 def comma(num):
     return '{:,}'.format(num)
 def normalize_callnumber(callnumber):
@@ -77,7 +80,7 @@ def parse_crtf_dir(reports_dir):
                         print ([rvalues[x] for x in columns])
                         print ("\n")
                     else:
-                        print ("\t\t\tAuto-detected columns: %s" % ", ".join([rvalues[x] for x in columns]))
+                        print ("\t\t\tAuto-detected columns: %s" % ", ".join([str(x) for x in columns]))
 
                     for row in range(1, sheet.nrows):
                         rvalues = sheet.row_values(row)
@@ -144,7 +147,8 @@ def parse_form(row, month):
         barcode = blines[0].strip()
 
         if not barcode in weeding_data_books:
-            print ("missing barcode: %s (%s, %s)" % (barcode, faculty["name"], faculty["department"]))
+            if not barcode in CHECKED_OUT_BARCODES:
+                print ("\t\tmissing barcode: %s (%s, %s)" % (barcode, faculty["name"], faculty["department"]))
             continue
         log_barcodes.append(barcode)
 
@@ -292,7 +296,7 @@ def create_master_list(month_barcodes, month):
     for barcode in month_barcodes:
         if barcode in master_barcodes:
             master_barcodes.remove(barcode)
-    print ("%s master list: %d - %d = %d === %d" % (
+    print ("\t\t%s master list: %d - %d = %d === %d" % (
         month,
         len(weeding_data_by_month[month]),
         len(month_barcodes),
@@ -304,10 +308,10 @@ def create_master_list(month_barcodes, month):
     log_file = "sources/%s-log.csv" % month
     log_file_text = ""
     if os.path.exists(log_file):
-        print ("\tChecking against %s..." % log_file)
+        print ("\t\tChecking against %s..." % log_file)
         log_file_text = open(log_file).read()
     else:
-        print ("\tChecking against all logs...")
+        print ("\t\tChecking against all logs...")
         log_files = [file.name for file in os.scandir("sources/") if file.is_file()]
         for log in log_files:
             log_file_text += open("sources/%s" % log).read()
@@ -325,8 +329,6 @@ def create_master_list(month_barcodes, month):
             outfile.write('%s,\n' % book_to_row(b))
 
 def create_department_graph(weeding_barcodes, books, month):
-    global weeding_data_by_month
-
     department_counts = {}
     for barcode in weeding_barcodes:
         dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
@@ -344,15 +346,11 @@ def create_department_graph(weeding_barcodes, books, month):
         dept_match = re.search('^([A-Z]+)', record["callnumber"])
         department = dept_match.group(1)
         if not department in department_counts:
-            department_counts[department] = {
-                "name": department,
-                "total": 0,
-                "retain": 0,
-                "personal": 0,
-            }
-        department_counts[department]["retain"] += 1
-        if record["for_personal"]:
-            department_counts[department]["personal"] += 1
+            print ("Wrong Month: %s (%s)" % (record["barcode"], department))
+        else:
+            department_counts[department]["retain"] += 1
+            if record["for_personal"]:
+                department_counts[department]["personal"] += 1
 
     department_bars = []
     for department in department_counts:
@@ -503,18 +501,18 @@ def callnumber_breakdowns(folder):
             "Donated to Better World Books",
             "Retained At Faculty Request",
             "Retained to Personal Collection"
-        ];
+        ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for key in department_counts:
             writer.writerow({
-               fieldnames[0]: key,
-               # fieldnames[1]: collection_totals[key],
-               fieldnames[1]: max(0, collection_totals[key] - gg_recommendations[key]),
-               fieldnames[2]: max(0, gg_recommendations[key] - department_counts[key]["total"]),
-               fieldnames[3]: max(0, department_counts[key]["total"] - department_counts[key]["retain"] - department_counts[key]["personal"]),
-               fieldnames[4]: department_counts[key]["retain"],
-               fieldnames[5]: department_counts[key]["personal"],
+                fieldnames[0]: key,
+                # fieldnames[1]: collection_totals[key],
+                fieldnames[1]: max(0, collection_totals[key] - gg_recommendations[key]),
+                fieldnames[2]: max(0, gg_recommendations[key] - department_counts[key]["total"]),
+                fieldnames[3]: max(0, department_counts[key]["total"] - department_counts[key]["retain"] - department_counts[key]["personal"]),
+                fieldnames[4]: department_counts[key]["retain"],
+                fieldnames[5]: department_counts[key]["personal"],
             })
 
     box_folder = "reports/%s/box_charts" % folder
@@ -723,13 +721,16 @@ for log in log_files:
     all_requests_by_month[month] = []
     print ("\t%s" % month)
 
-    header = True
     file = csv.reader(open("sources/%s" % log))
+    form_rows = []
+    header = True
     for row in file:
         if header:
             header = False
             continue
-        # date = datetime.datetime.strptime(row[0], '%b %d, %Y, %I:%M:%S %p')
+        form_rows.append(row)
+    form_rows.sort(key=lambda r: datetime.datetime.strptime(r[0], "%b %d, %Y, %I:%M:%S %p"))
+    for row in form_rows:
         barcodes, requests = parse_form(row, month)
         month_barcodes.extend(barcodes)
         all_requests_by_month[month].extend(requests)
@@ -766,7 +767,7 @@ create_retention_by_faculty(all_retained_books, cumulative_folder)
 create_personal_by_callnumber(all_retained_books, cumulative_folder)
 create_personal_by_faculty(all_retained_books, cumulative_folder)
 # Graphs
-create_department_graph(weeding_data_books.keys(), all_retained_books, cumulative_folder)
+create_department_graph(weeding_data_books.copy().keys(), all_retained_books, cumulative_folder)
 create_faculty_graph(all_retained_books, cumulative_folder)
 
 print ("\nGenerating callnumber breakdowns...")
