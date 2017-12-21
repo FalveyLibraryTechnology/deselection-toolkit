@@ -16,6 +16,8 @@ csv.field_size_limit(sys.maxsize)
 # Barcodes removed for being checked out
 CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("checked_out/barcodes_since_01Apr2017.txt").read().split("\n")]
 
+DEBUG = "no thanks"
+
 def comma(num):
     return '{:,}'.format(num)
 def normalize_callnumber(callnumber):
@@ -85,6 +87,8 @@ def parse_crtf_dir(reports_dir):
                     for row in range(1, sheet.nrows):
                         rvalues = sheet.row_values(row)
                         barcode = str(rvalues[columns[1]]).split(".")[0] # Remove decimaled barcodes
+                        if barcode == DEBUG:
+                            print ("DEBUG - parse_crtf_dir")
                         month_data[barcode] = {
                             "callnumber": rvalues[columns[0]],
                             "barcode": barcode,
@@ -145,8 +149,12 @@ def parse_form(row, month):
         bc = 0
         blines = bt.split('\n')
         barcode = blines[0].strip()
+        if barcode == DEBUG:
+            print ("DEBUG - parse_form")
 
         if not barcode in weeding_data_books:
+            if barcode == DEBUG:
+                print ("DEBUG - not in weeding_data_books")
             if not barcode in CHECKED_OUT_BARCODES:
                 print ("\t\tmissing barcode: %s (%s, %s)" % (barcode, faculty["name"], faculty["department"]))
             continue
@@ -296,6 +304,8 @@ def create_master_list(month_barcodes, month):
     for barcode in month_barcodes:
         if barcode in master_barcodes:
             master_barcodes.remove(barcode)
+        else:
+            print ("\t\tWrong month?: %s" % barcode)
     print ("\t\t%s master list: %d - %d = %d === %d" % (
         month,
         len(weeding_data_by_month[month]),
@@ -309,7 +319,7 @@ def create_master_list(month_barcodes, month):
     log_file_text = ""
     if os.path.exists(log_file):
         print ("\t\tChecking against %s..." % log_file)
-        log_file_text = open(log_file).read()
+        log_file_text = open(log_file, "r", encoding="utf-8").read()
     else:
         print ("\t\tChecking against all logs...")
         log_files = [file.name for file in os.scandir("sources/") if file.is_file()]
@@ -327,6 +337,30 @@ def create_master_list(month_barcodes, month):
         outfile.write('%s,"Action Taken"\n' % book_to_row_headers())
         for b in master_list:
             outfile.write('%s,\n' % book_to_row(b))
+
+def label_graph(filename, department_bars, month):
+    department_labels = []
+    for bar in department_bars:
+        name = bar[3]
+        p1 = 100 * bar[1] / bar[0]
+        p2 = 100 * bar[2] / bar[0]
+        label = name
+        if p1 > 0 or p2 > 0:
+            label += "\n"
+        if p1 > 0:
+            label += "%.1f%%" % p1
+            if p2 > 0:
+                label += "/"
+        if p2 > 0:
+            label += "%.1f%%" % p2
+        department_labels.append(label)
+    bar_graph(
+        "reports/%s/%s.png" % (month, filename),
+        [bar[:3] for bar in department_bars],
+        key=["Total Marked", "Total Retained", "Retained for Personal"],
+        labels=department_labels,
+        title=month
+    )
 
 def create_department_graph(weeding_barcodes, books, month):
     department_counts = {}
@@ -360,52 +394,18 @@ def create_department_graph(weeding_barcodes, books, month):
             department_counts[department]["personal"],
             department_counts[department]["name"],
         ])
-    department_bars.sort(key=lambda x: x[0], reverse=True)
-    department_labels = []
-    for bar in department_bars:
-        name = bar[3]
-        p1 = 100 * bar[1] / bar[0]
-        p2 = 100 * bar[2] / bar[0]
-        label = name
-        if p1 > 0 or p2 > 0:
-            label += "\n"
-        if p1 > 0:
-            label += "%.1f%%" % p1
-            if p2 > 0:
-                label += "/"
-        if p2 > 0:
-            label += "%.1f%%" % p2
-        department_labels.append(label)
-    bar_graph(
-        "reports/%s/callnumber_areas_sorted.png" % month,
-        [bar[:3] for bar in department_bars],
-        key=["Total Marked", "Total Retained", "Retained for Personal"],
-        labels=department_labels,
-        title=month
-    )
 
     department_bars.sort(key=lambda x: x[3], reverse=False)
-    department_labels = []
-    for bar in department_bars:
-        name = bar.pop()
-        p1 = 100 * bar[1] / bar[0]
-        p2 = 100 * bar[2] / bar[0]
-        label = name
-        if p1 > 0 or p2 > 0:
-            label += "\n"
-        if p1 > 0:
-            label += "%.1f%%" % p1
-            if p2 > 0:
-                label += "/"
-        if p2 > 0:
-            label += "%.1f%%" % p2
-        department_labels.append(label)
-    bar_graph(
-        "reports/%s/callnumber_areas.png" % month, department_bars,
-        key=["Total Marked", "Total Retained", "Retained for Personal"],
-        labels=department_labels,
-        title=month
-    )
+    label_graph("callnumber_areas_by_callnumber", department_bars, month)
+
+    department_bars.sort(key=lambda x: x[0], reverse=True)
+    label_graph("callnumber_areas_by_size", department_bars, month)
+
+    department_bars.sort(key=lambda x: x[1], reverse=True)
+    label_graph("callnumber_areas_by_retention", department_bars, month)
+
+    # department_bars.sort(key=lambda x: x[1] / x[0], reverse=True)
+    # label_graph("callnumber_areas_by_retention_percent", department_bars, month)
 
 def create_faculty_graph(books, month):
     books.sort(key=lambda b: b["faculty"])
@@ -705,7 +705,7 @@ def callnumber_breakdowns(folder):
 weeding_data_books = {}
 weeding_data_by_month = {}
 weeding_dirs = [dir.path for dir in os.scandir("sources/") if dir.is_dir()]
-print ("Weeding Files")
+print ("Gathering All Weeding Data...")
 for dir in weeding_dirs:
     month = dir.split("/")[1]
     print ("\t%s" % month)
@@ -713,7 +713,7 @@ for dir in weeding_dirs:
     weeding_data_books.update(month_data)
     weeding_data_by_month[month] = make_unique(month_data.copy().keys())
 
-print ("Log Files")
+print ("Analyzing Monthly Log Files...")
 log_files = [file.name for file in os.scandir("sources/") if file.is_file()]
 for log in log_files:
     month = log.split("-")[0]
@@ -721,7 +721,7 @@ for log in log_files:
     all_requests_by_month[month] = []
     print ("\t%s" % month)
 
-    file = csv.reader(open("sources/%s" % log))
+    file = csv.reader(open("sources/%s" % log, "r", encoding="utf-8"))
     form_rows = []
     header = True
     for row in file:
@@ -754,6 +754,7 @@ for log in log_files:
     create_faculty_graph(month_books, month)
 
 # Cumulative Records
+print ("\nGenerating cumulative reports...")
 cumulative_folder = "Cumulative"
 if not os.path.exists('reports/%s' % cumulative_folder):
     os.mkdir('reports/%s' % cumulative_folder)
@@ -769,6 +770,8 @@ create_personal_by_faculty(all_retained_books, cumulative_folder)
 # Graphs
 create_department_graph(weeding_data_books.copy().keys(), all_retained_books, cumulative_folder)
 create_faculty_graph(all_retained_books, cumulative_folder)
+
+exit(0)
 
 print ("\nGenerating callnumber breakdowns...")
 totals = callnumber_breakdowns(cumulative_folder)
