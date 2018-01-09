@@ -188,7 +188,7 @@ def parse_form(row, month):
     return [log_barcodes, all_requests]
 
 def book_to_row_headers():
-    return '"Callnumber","Barcode","Publication Year","Title","Author"'
+    return "Callnumber,Barcode,Publication Year,Title,Author"
 def book_to_row(book):
     return '"%s",%s,%s,"%s","%s"' % (
         book["callnumber"],
@@ -201,40 +201,44 @@ def book_to_row(book):
 def create_retention_by_callnumber(books, month):
     books.sort(key=lambda b: b["callnumber_sort"])
     with open('reports/%s/all-retention-by-callnumber.csv' % month, 'w', encoding="utf8") as outfile:
-        outfile.write('%s,"%s","%s"\n' % (book_to_row_headers(),"Requesting Faculty","Destination"))
+        outfile.write('%s,Destination,Requesting Faculty,Comment\n' % book_to_row_headers())
         for record in books:
-            outfile.write('%s,"%s","%s"\n' % (book_to_row(record), record["faculty"], "Personal" if record["for_personal"] else "Retain"))
+            outfile.write('%s,"%s","%s","%s"\n' % (book_to_row(record), "Personal" if record["for_personal"] else "Retain", record["faculty"], record["comment"]))
 
 def create_retention_by_faculty(books, month):
     last_name = ""
     books.sort(key=lambda b: b["faculty"])
     with open('reports/%s/all-retention-by-faculty.csv' % month, 'w', encoding="utf8") as outfile:
+        outfile.write("Faculty,Department,Address\n")
+        outfile.write(",Retention Type,%s,Comment\n" % book_to_row_headers())
         for record in books:
             if last_name != record["faculty"]:
                 last_name = record["faculty"]
                 faculty = all_faculty[record["faculty"]]
                 outfile.write('"%s","%s","%s"\n' % (faculty["name"], faculty["department"], faculty["address"]))
-            outfile.write(',"%s",%s\n' % ("Personal" if record["for_personal"] else "Retain", book_to_row(record)))
+            outfile.write(',"%s",%s,"%s"\n' % ("Personal" if record["for_personal"] else "Retain", book_to_row(record), record["comment"]))
 
 def create_personal_by_callnumber(books, month):
     personal = [b for b in books if b["for_personal"]]
     books.sort(key=lambda b: b["callnumber_sort"])
     with open('reports/%s/for-personal-collections-by-callnumber.csv' % month, 'w', encoding="utf8") as outfile:
-        outfile.write('%s,"Requesting Faculty","Campus Address"\n' % book_to_row_headers())
+        outfile.write('%s,Requesting Faculty,Campus Address\n' % book_to_row_headers())
         for record in personal:
-            outfile.write('%s,"%s","%s"\n' % (book_to_row(record), record["faculty"], all_faculty[record["faculty"]]["address"]))
+            outfile.write('%s,"%s","%s","%s"\n' % (book_to_row(record), record["faculty"], all_faculty[record["faculty"]]["address"], record["comment"]))
 
 def create_personal_by_faculty(books, month):
     last_name = ""
     personal = [b for b in books if b["for_personal"]]
     personal.sort(key=lambda b: b["faculty"])
     with open('reports/%s/for-personal-collections-by-faculty.csv' % month, 'w', encoding="utf8") as outfile:
+        outfile.write("Faculty,Department,Address\n")
+        outfile.write(",%s,Comment\n" % book_to_row_headers())
         for record in personal:
             if last_name != record["faculty"]:
                 last_name = record["faculty"]
                 faculty = all_faculty[record["faculty"]]
                 outfile.write('"%s","%s","%s"\n' % (faculty["name"], faculty["department"], faculty["address"]))
-            outfile.write(',%s\n' % book_to_row(record))
+            outfile.write(',%s,"%s"\n' % (book_to_row(record), record["comment"]))
 
 def create_emails(books, month):
     global all_requests_by_month
@@ -770,8 +774,6 @@ create_personal_by_faculty(all_retained_books, cumulative_folder)
 # Graphs
 create_department_graph(weeding_data_books.copy().keys(), all_retained_books, cumulative_folder)
 create_faculty_graph(all_retained_books, cumulative_folder)
-
-exit(0)
 
 print ("\nGenerating callnumber breakdowns...")
 totals = callnumber_breakdowns(cumulative_folder)
