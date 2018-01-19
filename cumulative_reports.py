@@ -240,8 +240,12 @@ def create_personal_by_faculty(books, month):
                 outfile.write('"%s","%s","%s"\n' % (faculty["name"], faculty["department"], faculty["address"]))
             outfile.write(',%s,"%s"\n' % (book_to_row(record), record["comment"]))
 
+faculty_email_map = {}
+class_json = json.load(open("class_data.json", "r"))
+for c in class_json:
+    faculty_email_map[c["prof_name"]] = c["prof_email"]
 def create_emails(books, month):
-    global all_requests_by_month
+    global all_faculty, all_requests_by_month
     faculty_emails = {}
     for request in all_requests_by_month[month]:
         if request["barcode"] in all_effective and request["for_personal"]:
@@ -263,9 +267,17 @@ def create_emails(books, month):
 
     with open('reports/%s/personal-retention-emails.csv' % month, 'w', newline="", encoding="utf8") as outfile:
         writer = csv.writer(outfile)
-        writer.writerow(["Faculty", "Department", "Address", "Email"])
+        writer.writerow(["Faculty", "Department", "Address", "Email Address", "Email Text"])
         for name in faculty_emails:
             faculty = faculty_emails[name]
+            name_regex = re.compile(" .*?".join(name.split(" ")))
+            email_address = ""
+            for prof in faculty_email_map:
+                if name_regex.match(prof):
+                    email_address = faculty_email_map[prof]
+                    break
+            if not email_address:
+                print ("\t\tNo email for %s" % name)
             # print (name, len(faculty["theirs"]))
             if len(faculty["in_library"]) + len(faculty["theirs"]) + len(faculty["too_late"]) == 0:
                 continue
@@ -275,10 +287,10 @@ def create_emails(books, month):
             else:
                 receiving = "Unfortunately, all of the books you requested fell into one of these precedence categories."
             staying = ""
-            if len(faculty["in_library"]) > 0:
+            if False and len(faculty["in_library"]) > 0:
                 staying = "\n\nThe following books you requested will be kept in the collection:\n\n - %s" % "\n - ".join(make_unique(faculty["in_library"]))
             other = ""
-            if len(faculty["too_late"]) > 0:
+            if False and len(faculty["too_late"]) > 0:
                 if len(faculty["theirs"]) > 0 or len(faculty["in_library"]) > 0:
                     if len(faculty["too_late"]) == 1:
                         other = "\n\nThe final book you requested was requested by another faculty member before you, so you will not be receiving this item."
@@ -289,15 +301,20 @@ def create_emails(books, month):
                         other = "\n\nUnfortunately, the book you requested was requested by another faculty member before you, so we're sorry to say that you will not be receiving your requested item."
                     else:
                         other = "\n\nUnfortunately, all the books you requested were requested by another faculty member before you requested them, so we're sorry to say that you will not be receiving your requested items."
-            writer.writerow([name, all_faculty[name]["department"], all_faculty[name]["address"],
+            writer.writerow([name, all_faculty[name]["department"], all_faculty[name]["address"], email_address,
 """Dear %s,
 
-We received your request to keep some of the deselected books for your own collection. This email is to inform you of the outcome of that request. We take a few things into consideration when we handle personal requests and these considerations may affect which of your requested items you receive. First, if anyone requested a book to stay in the library's collection, that will take precedence over a personal request. Also, personal requests are on a first come, first serve basis, so if someone requested one of the books you wanted before you did, the earlier request will take precedence.
+We received your request to keep some of the deselected books for your own collection. This email is to inform you of the outcome of that request. We take a few things into consideration when we handle personal requests and these considerations may affect which of your requested items you receive. First, if anyone requested a book to stay in the library's collection, that will take precedence over a personal request. Also, personal requests are on a first-come, first-serve basis, so if someone requested one of the books you wanted before you did, the earlier request will take precedence.
 
 %s%s%s
 
-Best,
-[YOUR NAME HERE]
+Please contact me with questions or concerns via email at cordesia.pope@villanova.edu.
+
+Thank you,
+
+Cordesia Pope
+Collection Review Task Force
+Falvey Memorial Library
 """ % (name, receiving, staying, other)])
 
 def create_master_list(month_barcodes, month):
