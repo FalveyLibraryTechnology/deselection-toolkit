@@ -791,10 +791,10 @@ create_personal_by_faculty(all_retained_books, cumulative_folder)
 # Graphs
 create_department_graph(weeding_data_books.copy().keys(), all_retained_books, cumulative_folder)
 create_faculty_graph(all_retained_books, cumulative_folder)
-
+'''
 print ("\nGenerating callnumber breakdowns...")
 totals = callnumber_breakdowns(cumulative_folder)
-
+'''
 print ("\nExport all retention as json...")
 all_book_requests = []
 for month in all_requests_by_month:
