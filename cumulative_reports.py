@@ -468,10 +468,10 @@ def create_faculty_graph(books, month):
     )
 
 def callnumber_breakdowns(folder):
-    global all_effective
+    global all_effective, weeding_data_books
 
     department_counts = {}
-    for barcode in all_effective:
+    for barcode in weeding_data_books:
         dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
         department = dept_match.group(1)
         if not department in department_counts:
@@ -482,8 +482,10 @@ def callnumber_breakdowns(folder):
                 "personal": 0,
             }
         department_counts[department]["total"] += 1
+    for barcode in all_effective:
+        dept_match = re.search('^([A-Z]+)', weeding_data_books[barcode]["callnumber"])
+        department = dept_match.group(1)
         record = all_effective[barcode]
-        department_counts[department]["total"] += 1
         if record["for_personal"]:
             department_counts[department]["personal"] += 1
         else:
@@ -491,7 +493,7 @@ def callnumber_breakdowns(folder):
 
     gg_recommendations = {}
     collection_totals = {}
-    with open_workbook("GreenGlass Project Overview.xlsx") as gg_report:
+    with open_workbook("adjustments/GreenGlass Project Overview.xlsx") as gg_report:
         sheet = gg_report.sheet_by_index(0)
         for r in range(2, sheet.nrows):
             rvalues = [str(x).strip() for x in sheet.row_values(r)]
@@ -502,12 +504,13 @@ def callnumber_breakdowns(folder):
                 callnumber = callnumber[11:]
             if len(callnumber) > 2:
                 callnumber = callnumber[:2]
-            gg_withdrawl = int(float(rvalues[6])) if len(rvalues[6]) > 0 else 0 # Matches
+            gg_withdrawl = int(float(rvalues[6])) if len(rvalues[7]) > 0 else 0 # Withdrawl
             c_total = int(float(rvalues[5])) if len(rvalues[5]) > 0 else 0      # Total
             if callnumber in department_counts:
                 if not callnumber in gg_recommendations:
-                    collection_totals[callnumber] = c_total
-                    gg_recommendations[callnumber] = gg_withdrawl
+                    if c_total > 0:
+                        collection_totals[callnumber] = c_total
+                        gg_recommendations[callnumber] = gg_withdrawl
                 else:
                     collection_totals[callnumber] += c_total
                     gg_recommendations[callnumber] += gg_withdrawl
@@ -525,17 +528,17 @@ def callnumber_breakdowns(folder):
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for key in department_counts:
+        for key in collection_totals:
             writer.writerow({
                 fieldnames[0]: key,
                 # fieldnames[1]: collection_totals[key],
-                fieldnames[1]: max(0, collection_totals[key] - gg_recommendations[key]),
+                fieldnames[1]: max(0, collection_totals[key] - gg_recommendations[key] - department_counts[key]["total"]),
                 fieldnames[2]: max(0, gg_recommendations[key] - department_counts[key]["total"]),
                 fieldnames[3]: max(0, department_counts[key]["total"] - department_counts[key]["retain"] - department_counts[key]["personal"]),
                 fieldnames[4]: department_counts[key]["retain"],
                 fieldnames[5]: department_counts[key]["personal"],
             })
-
+    '''
     box_folder = "reports/%s/box_charts" % folder
     data_folder = "reports/%s/pies_data" % folder
     full_folder = "reports/%s/pies_full" % folder
@@ -552,15 +555,13 @@ def callnumber_breakdowns(folder):
 
     bar = ProgressBar(len(collection_totals.keys()))
     for cn in collection_totals:
-        '''
-        print ("%s: %s / %s (%s / %s)" % (
-            cn.rjust(2),
-            str(gg_recommendations[cn]).rjust(4),
-            str(collection_totals[cn]).ljust(6),
-            str(department_counts[cn]["retain"] + department_counts[cn]["personal"]).rjust(4),
-            str(department_counts[cn]["total"]).ljust(4),
-        ))
-        '''
+        # print ("%s: %s / %s (%s / %s)" % (
+        #     cn.rjust(2),
+        #     str(gg_recommendations[cn]).rjust(4),
+        #     str(collection_totals[cn]).ljust(6),
+        #     str(department_counts[cn]["retain"] + department_counts[cn]["personal"]).rjust(4),
+        #     str(department_counts[cn]["total"]).ljust(4),
+        # ))
         if collection_totals[cn] > 0:
             exempt = max(0, collection_totals[cn] - gg_recommendations[cn])
             retain_qual = max(0, gg_recommendations[cn] - department_counts[cn]["total"])
@@ -717,9 +718,11 @@ def callnumber_breakdowns(folder):
             })
         bar.progress()
     bar.finish()
+    '''
     return {
         "greenglass": gg_recommendations,
         "book_totals": collection_totals,
+        "department_counts": department_counts
     }
 
 # Compile all resources into weeding_master
@@ -791,10 +794,10 @@ create_personal_by_faculty(all_retained_books, cumulative_folder)
 # Graphs
 create_department_graph(weeding_data_books.copy().keys(), all_retained_books, cumulative_folder)
 create_faculty_graph(all_retained_books, cumulative_folder)
-'''
+
 print ("\nGenerating callnumber breakdowns...")
 totals = callnumber_breakdowns(cumulative_folder)
-'''
+
 print ("\nExport all retention as json...")
 all_book_requests = []
 for month in all_requests_by_month:
@@ -820,5 +823,7 @@ for book in all_book_requests:
         book.update(weeding_data_books[book["barcode"]])
         book["department"] = all_faculty[book["faculty"]]["department"]
         del book["faculty"]
-totals.update({ "retention": all_book_requests })
-json.dump(totals, open("retention_data.json", "w"), indent=4, sort_keys=True)
+
+if "totals" in globals():
+    totals.update({ "retention": all_book_requests })
+    json.dump(totals, open("retention_data.json", "w"), indent=4, sort_keys=True)
