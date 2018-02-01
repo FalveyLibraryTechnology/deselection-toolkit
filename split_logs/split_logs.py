@@ -69,7 +69,7 @@ def parse_form(row):
                     break
         except Exception as e:
             if not barcode in CHECKED_OUT_BARCODES:
-                print ("\tmissing barcode: %s" % barcode)
+                print ("\tmissing barcode: %s (%s)" % (barcode, row[0]))
     for month in by_month:
         by_month[month] = [row[0], row[1], row[2], row[3], "Barcode:\n".join(by_month[month]).strip()]
     return by_month
@@ -86,7 +86,7 @@ for dir in weeding_dirs:
     month_by_index[len(all_barcodes) + len(month_barcodes)] = month
     all_barcodes.extend(month_barcodes)
 
-print (all_barcodes[0])
+open("debug-all_barcodes.txt", "w").write("\n".join(all_barcodes));
 print (month_by_index)
 
 print ("\nAnalyzing Consolidated Log File...")
