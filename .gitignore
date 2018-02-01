@@ -1,0 +1,22 @@
+# Output folders
+hashes/
+reports/
+split_logs/out/
+split_logs/*.txt
+sources/
+
+# Villanova Data
+Archive/
+checked_out/
+*.csv
+*.json
+
+# Villanova Content
+adjustments/
+fonts/Gotham*
+split_logs/raw-log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
