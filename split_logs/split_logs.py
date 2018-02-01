@@ -10,7 +10,7 @@ from xlrd import open_workbook  # Excel files
 csv.field_size_limit(sys.maxsize)
 
 # Barcodes removed for being checked out
-CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("../checked_out/barcodes_since_01Apr2017.txt").read().split("\n")]
+CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("../checked_out/checkedout_since_greenglass.txt").read().split("\n")]
 
 def make_unique(arr):
     return list(set(filter(None, arr)))
