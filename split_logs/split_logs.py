@@ -15,6 +15,9 @@ CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("../checked_out/checke
 def make_unique(arr):
     return list(set(filter(None, arr)))
 
+BARCODES_BY_FILE = {}
+MONTHS_BY_FILE = {}
+REQUESTS_BY_FILE = {}
 def parse_crtf_dir(reports_dir):
     barcodes = []
     for dirpath, dirnames, filenames in os.walk(reports_dir):
@@ -41,19 +44,35 @@ def parse_crtf_dir(reports_dir):
                 # else:
                 #     print ("\t\t\tAuto-detected columns: %s" % ", ".join([str(x) for x in columns]))
 
+                BARCODES_BY_FILE[filename] = []
+                MONTHS_BY_FILE[filename] = []
                 for row in range(1, sheet.nrows):
                     rvalues = sheet.row_values(row)
                     barcode = str(rvalues[columns[0]]).split(".")[0] # Remove decimaled barcodes
                     barcodes.append(barcode)
+                    BARCODES_BY_FILE[filename].append(barcode)
     return make_unique(barcodes)
 
 def parse_form(row):
     global all_barcodes, month_by_index
 
+    form_month = datetime.datetime.strptime(row[0], "%b %d, %Y, %I:%M:%S %p").strftime("%B %Y")
+    lines = row[4].split('\n')
+    current = 0
+    faculty_name = ""
+    while lines[current] != 'Faculty First Name:':
+        current += 1
+    faculty_name = lines[current + 1]
+
+    while lines[current] != 'Faculty Last Name:':
+        current += 1
+    faculty_name += ' ' + lines[current + 1]
+
     by_month = {}
     parts = row[4].split("Barcode:\n")
     headers = parts[0]
     book_submissions = parts[1:]
+    first_barcode = True
     for bt in book_submissions:
         bc = 0
         blines = bt.split('\n')
@@ -66,8 +85,22 @@ def parse_form(row):
                     if not month in by_month:
                         by_month[month] = [headers]
                     by_month[month].append(bt)
+                    # Save month by file
+                    if first_barcode:
+                        for file in MONTHS_BY_FILE:
+                            if barcode in BARCODES_BY_FILE[file]:
+                                if not form_month in MONTHS_BY_FILE[file]:
+                                    MONTHS_BY_FILE[file].append(form_month)
+                                op = "%s (%s) (%d)" % (faculty_name, row[0], len(book_submissions))
+                                if not file in REQUESTS_BY_FILE:
+                                    REQUESTS_BY_FILE[file] = [op]
+                                else:
+                                    REQUESTS_BY_FILE[file].append(op)
+                                break
+                        first_barcode = False
                     break
         except Exception as e:
+            print (e)
             if not barcode in CHECKED_OUT_BARCODES:
                 print ("\tmissing barcode: %s (%s)" % (barcode, row[0]))
     for month in by_month:
@@ -115,3 +148,9 @@ for month in forms_by_month:
         outfile.write("Date,Level,Channel,User,Message\n")
         writer = csv.writer(outfile)
         writer.writerows(forms_by_month[month])
+
+print ("\nDetected extensions:")
+for file in MONTHS_BY_FILE:
+    if len(MONTHS_BY_FILE[file]) > 1:
+        print (file.ljust(30), ", ".join(MONTHS_BY_FILE[file]))
+json.dump(REQUESTS_BY_FILE, open("requests_by_file.json", "w"), indent=4)

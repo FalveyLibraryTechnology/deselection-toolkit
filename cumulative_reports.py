@@ -16,16 +16,11 @@ csv.field_size_limit(sys.maxsize)
 # Barcodes removed for being checked out
 CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("checked_out/checkedout_since_greenglass.txt").read().split("\n")]
 
-DEBUG = "no thanks"
+DEBUG = "no thanks" # choose a barcode to check
 
 def comma(num):
     return '{:,}'.format(num)
 def normalize_callnumber(callnumber):
-    # BL237.5.Q47 1988
-    # BL237 .I5
-    # BL 0237000I  5
-    # BV 1471200T  8           1990
-    # BV 2160000               1908
     section = re.search("^([A-Z]+)", callnumber).group(1)
     number_match = re.search("^[A-Z ]+([\d\.]+[ \.]*)", callnumber)
     number = number_match.group(1).strip(" .")
@@ -36,7 +31,8 @@ def normalize_callnumber(callnumber):
     else:
         letter = letter.group(1)
     extra = "".join([p.strip().ljust(12) for p in rem.split(" ")])
-    return ("%s %04d00%s  %s" % (section.ljust(2), float(number) * 10, letter, extra)).strip()
+    num_str = "%05d" % (float(number) * 10000,)
+    return ("%s %s %s %s" % (section.ljust(2), num_str.zfill(12), letter, extra)).strip()
 
 # print (normalize_callnumber("BL237.5.Q47 1988") )
 # BL 0237500Q  47          1988
@@ -48,12 +44,15 @@ def normalize_callnumber(callnumber):
 def make_unique(arr):
     return list(set(filter(None, arr)))
 
+REVIEWED_COUNT = 0
 def parse_crtf_dir(reports_dir):
+    global LIBRARIAN_RETENTION, REVIEWED_COUNT
+
     month_data = {}
     hash = dirhash(reports_dir, 'md5')
     if not os.path.exists('hashes/'):
         os.mkdir('hashes/')
-    if not os.path.exists('hashes/%s.json' % hash):
+    if True or not os.path.exists('hashes/%s.json' % hash):
         for dirpath, dirnames, filenames in os.walk(reports_dir):
             for filename in filenames:
                 with open_workbook(os.path.join(dirpath, filename)) as book:
@@ -81,9 +80,11 @@ def parse_crtf_dir(reports_dir):
                         columns = [int(x) for x in input("\nWhich cols correspond to %s?\n(comma separated) >: " % ", ".join(column_names)).split(',')]
                         print ([rvalues[x] for x in columns])
                         print ("\n")
-                    else:
-                        print ("\t\t\tAuto-detected columns: %s" % ", ".join([str(x) for x in columns]))
+                    # else:
+                    #     print ("\t\t\tAuto-detected columns: %s" % ", ".join([str(x) for x in columns]))
 
+                    check_letter = filename[0]
+                    callnumbers = []
                     for row in range(1, sheet.nrows):
                         rvalues = sheet.row_values(row)
                         barcode = str(rvalues[columns[1]]).split(".")[0] # Remove decimaled barcodes
@@ -97,6 +98,28 @@ def parse_crtf_dir(reports_dir):
                             "author": rvalues[columns[3]],
                             "callnumber_sort": normalize_callnumber(rvalues[columns[0]]),
                         }
+                        callnumbers.append(month_data[barcode]["callnumber_sort"])
+                    # Calculate library retention
+                    callnumbers.sort()
+                    REVIEWED_COUNT += len(callnumbers)
+                    first_callnumber = False
+                    last_callnumber = False
+                    for i in range(0, 20):
+                        if check_letter == callnumbers[i][0]:
+                            first_callnumber = callnumbers[i]
+                            break
+                    for i in range(0, 20):
+                        index = len(callnumbers) - i - 1
+                        if check_letter == callnumbers[index][0]:
+                            last_callnumber = callnumbers[index]
+                            break
+                    first_index = GG_CALLNUMBERS.index(first_callnumber)
+                    last_index = GG_CALLNUMBERS.index(last_callnumber)
+                    gg_rec = last_index - first_index + 1
+                    LIBRARIAN_RETENTION += gg_rec - len(callnumbers)
+                    print ("\t\t\tLibrarian Retention: %d (%d - %d)" % (gg_rec - len(callnumbers), gg_rec, len(callnumbers)))
+                    print ("\t\t\t\t%d %s" % (first_index, first_callnumber))
+                    print ("\t\t\t\t%d %s" % (last_index, last_callnumber))
         with open('hashes/%s.json' % hash, 'w') as jsonFile:
             json.dump(month_data, jsonFile, separators=(',',':'))
     else:
@@ -504,7 +527,7 @@ def callnumber_breakdowns(folder):
                 callnumber = callnumber[11:]
             if len(callnumber) > 2:
                 callnumber = callnumber[:2]
-            gg_withdrawl = int(float(rvalues[6])) if len(rvalues[7]) > 0 else 0 # Withdrawl
+            gg_withdrawl = int(float(rvalues[6])) if len(rvalues[6]) > 0 else 0 # Matches
             c_total = int(float(rvalues[5])) if len(rvalues[5]) > 0 else 0      # Total
             if callnumber in department_counts:
                 if not callnumber in gg_recommendations:
@@ -538,16 +561,30 @@ def callnumber_breakdowns(folder):
                 fieldnames[4]: department_counts[key]["retain"],
                 fieldnames[5]: department_counts[key]["personal"],
             })
+    data_folder = "reports/%s/pies_data" % folder
+    if not os.path.exists(data_folder):
+        os.mkdir(data_folder)
+    for cn in collection_totals:
+        if collection_totals[cn] > 0:
+            exempt = max(0, collection_totals[cn] - gg_recommendations[cn])
+            retain_qual = max(0, gg_recommendations[cn] - department_counts[cn]["total"])
+            donated = max(0, department_counts[cn]["total"] - department_counts[cn]["retain"] - department_counts[cn]["personal"])
+
+            with open(data_folder + "/%s.csv" % cn, "w") as csvfile:
+                csvfile.write("%s,%%,#\n" % cn)
+                csvfile.write("Exempt from review after quantitative analysis,%f,%d\n" % (exempt / collection_totals[cn], exempt))
+                csvfile.write("Retained based on qualitative analysis,%f,%d\n" % (retain_qual / collection_totals[cn], retain_qual))
+                csvfile.write("Retained based on faculty feedback,%f,%d\n" % (department_counts[cn]["retain"] / collection_totals[cn], department_counts[cn]["retain"]))
+                csvfile.write("Donated to faculty on request,%f,%d\n" % (department_counts[cn]["personal"] / collection_totals[cn], department_counts[cn]["personal"]))
+                csvfile.write("Donated to Better World Books,%f,%d\n" % (donated / collection_totals[cn], donated))
+                csvfile.write("Total books,1,%d\n" % collection_totals[cn])
     '''
     box_folder = "reports/%s/box_charts" % folder
-    data_folder = "reports/%s/pies_data" % folder
     full_folder = "reports/%s/pies_full" % folder
     stacked_folder = "reports/%s/pies_stacked" % folder
 
     if not os.path.exists(box_folder):
         os.mkdir(box_folder)
-    if not os.path.exists(data_folder):
-        os.mkdir(data_folder)
     if not os.path.exists(full_folder):
         os.mkdir(full_folder)
     if not os.path.exists(stacked_folder):
@@ -569,12 +606,12 @@ def callnumber_breakdowns(folder):
 
             with open(data_folder + "/%s.csv" % cn, "w") as csvfile:
                 csvfile.write("%s,%%,#\n" % cn)
-                csvfile.write("Total books,1,%d\n" % collection_totals[cn])
                 csvfile.write("Exempt from review after quantitative analysis,%f,%d\n" % (exempt / collection_totals[cn], exempt))
                 csvfile.write("Retained based on qualitative analysis,%f,%d\n" % (retain_qual / collection_totals[cn], retain_qual))
                 csvfile.write("Retained based on faculty feedback,%f,%d\n" % (department_counts[cn]["retain"] / collection_totals[cn], department_counts[cn]["retain"]))
                 csvfile.write("Donated to faculty on request,%f,%d\n" % (department_counts[cn]["personal"] / collection_totals[cn], department_counts[cn]["personal"]))
                 csvfile.write("Donated to Better World Books,%f,%d\n" % (donated / collection_totals[cn], donated))
+                csvfile.write("Total books,1,%d\n" % collection_totals[cn])
 
             pie_chart(stacked_folder + "/%s_stacked.png" % cn, {
                 "total": collection_totals[cn],
@@ -730,6 +767,9 @@ weeding_data_books = {}
 weeding_data_by_month = {}
 weeding_dirs = [dir.path for dir in os.scandir("sources/") if dir.is_dir()]
 print ("Gathering All Weeding Data...")
+file_ranges = {}
+LIBRARIAN_RETENTION = 0
+GG_CALLNUMBERS = open("gg_archive/gg_callnumbers.txt", "r").read().split("\n")
 for dir in weeding_dirs:
     month = dir.split("/")[1]
     print ("\t%s" % month)
@@ -827,3 +867,59 @@ for book in all_book_requests:
 if "totals" in globals():
     totals.update({ "retention": all_book_requests })
     json.dump(totals, open("retention_data.json", "w"), indent=4, sort_keys=True)
+
+COLLECTION_COUNT = 541277 # GG XLSX
+REVIEWED_COUNT += LIBRARIAN_RETENTION
+FACULTY_PROTECTED = len([b for b in all_effective if not all_effective[b]["for_personal"]])
+FACULTY_KEPT = len([b for b in all_effective if all_effective[b]["for_personal"]])
+REMOVED = REVIEWED_COUNT - LIBRARIAN_RETENTION - FACULTY_PROTECTED
+with open("progress_report.tsv", "w") as report:
+    report.write("Category\tTotal\tPercentage of Total\tPercentage of GG Recommendations\tPercentage of Reviewed\tPercentage of Items Posted for Faculty Review\n")
+    report.write("All Monographs\t%s\n" % (comma(COLLECTION_COUNT),))
+    report.write(
+        "Protected by GreenGlass Criteria\t%s\t%0.1f%%\n" % (
+            comma(COLLECTION_COUNT - len(GG_CALLNUMBERS)),
+            100 * (COLLECTION_COUNT - len(GG_CALLNUMBERS)) / COLLECTION_COUNT
+        )
+    )
+    report.write(
+        "Reviewed To Date\t%s\t%0.2f%%\t%0.2f%%\n" % (
+            comma(REVIEWED_COUNT),
+            100 * REVIEWED_COUNT / COLLECTION_COUNT,
+            100 * REVIEWED_COUNT / len(GG_CALLNUMBERS),
+        )
+    )
+    report.write(
+        "Protected by Librarians\t%s\t%0.2f%%\t%0.2f%%\t%0.2f%%\n" % (
+            comma(LIBRARIAN_RETENTION),
+            100 * LIBRARIAN_RETENTION / COLLECTION_COUNT,
+            100 * LIBRARIAN_RETENTION / len(GG_CALLNUMBERS),
+            100 * LIBRARIAN_RETENTION / REVIEWED_COUNT,
+        )
+    )
+    report.write(
+        "Protected by Faculty\t%s\t%0.2f%%\t%0.2f%%\t%0.2f%%\t%0.2f%%\n" % (
+            comma(FACULTY_PROTECTED),
+            100 * FACULTY_PROTECTED / COLLECTION_COUNT,
+            100 * FACULTY_PROTECTED / len(GG_CALLNUMBERS),
+            100 * FACULTY_PROTECTED / REVIEWED_COUNT,
+            100 * FACULTY_PROTECTED / (REVIEWED_COUNT - LIBRARIAN_RETENTION),
+        )
+    )
+    report.write(
+        "Kept by Faculty\t%s\t%0.2f%%\t%0.2f%%\t%0.2f%%\t%0.2f%%\n" % (
+            comma(FACULTY_KEPT),
+            100 * FACULTY_KEPT / COLLECTION_COUNT,
+            100 * FACULTY_KEPT / len(GG_CALLNUMBERS),
+            100 * FACULTY_KEPT / REVIEWED_COUNT,
+            100 * FACULTY_KEPT / (REVIEWED_COUNT - LIBRARIAN_RETENTION),
+        )
+    )
+    report.write(
+        "Removed from the Library (Donated or Kept)\t%s\t%0.2f%%\t%0.2f%%\t%0.2f%%\n" % (
+            comma(REMOVED),
+            100 * REMOVED / COLLECTION_COUNT,
+            100 * REMOVED / len(GG_CALLNUMBERS),
+            100 * REMOVED / REVIEWED_COUNT,
+        )
+    )
