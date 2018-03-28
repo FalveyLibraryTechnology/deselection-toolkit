@@ -35,7 +35,7 @@ def bar_graph(filename, data, title=None, key=None, labels=None, numbers=True):
 
     im = Image.new("RGB", (width, height), (255, 255, 255))
     draw = ImageDraw.Draw(im)
-    gotham_font = ImageFont.truetype("fonts/opensans-semibold-webfont.otf", 10)
+    gotham_font = ImageFont.truetype("fonts/opensans-semibold-webfont.ttf", 10)
 
     bottom_pad = 0
     if labels != None:
@@ -106,7 +106,7 @@ def bar_graph(filename, data, title=None, key=None, labels=None, numbers=True):
 
     # Titles
     if title != None:
-        gotham_title = ImageFont.truetype("fonts/opensans-semibold-webfont.otf", 24)
+        gotham_title = ImageFont.truetype("fonts/opensans-semibold-webfont.ttf", 24)
         title_w, title_h = draw.textsize(title, font=gotham_title)
         draw.text((width - title_w - padding, padding), title, fill=(0, 0, 0), font=gotham_title)
 
@@ -144,7 +144,7 @@ def pie_chart(filename, data, gap=0):
     im = Image.new("RGB", (full_width, full_width), (255, 255, 255))
     draw = ImageDraw.Draw(im)
 
-    gotham_title = ImageFont.truetype("fonts/opensans-semibold-webfont.otf", 48)
+    gotham_title = ImageFont.truetype("fonts/opensans-semibold-webfont.ttf", 48)
     title_w, title_h = draw.textsize(data["title"], font=gotham_title)
     draw.text(((padding + width - title_w) / 2, (padding - title_h) / 2), data["title"], fill=(0, 0, 0), font=gotham_title)
 
@@ -165,7 +165,7 @@ def pie_chart(filename, data, gap=0):
         draw.pieslice(arc_xy, levels[arc["level"]], levels[arc["level"]] + perc, fill=arc["color"])
         levels[arc["level"]] += perc
 
-    gotham_medium = ImageFont.truetype("fonts/opensans-semibold-webfont.otf", 12)
+    gotham_medium = ImageFont.truetype("fonts/opensans-semibold-webfont.ttf", 12)
     _, line_height = draw.textsize("0g", font=gotham_medium)
     box_width = full_width / len(label_text)
     box_height = line_height * 4
@@ -186,7 +186,7 @@ def box_chart(filename, data):
     gutter = 50
     im = Image.new("RGB", (width, height + gutter), (200, 200, 200))
     draw = ImageDraw.Draw(im)
-    gotham_title = ImageFont.truetype("fonts/opensans-semibold-webfont.otf", 24)
+    gotham_title = ImageFont.truetype("fonts/opensans-semibold-webfont.ttf", 24)
 
     data_total = 0
     min_width = 3
@@ -249,7 +249,7 @@ def box_chart(filename, data):
     # region = region.rotate(90)
     # im.paste(region, chart_box)
 
-    gotham_label = ImageFont.truetype("fonts/opensans-semibold-webfont.otf", 12)
+    gotham_label = ImageFont.truetype("fonts/opensans-semibold-webfont.ttf", 12)
     # draw.rectangle((0,0 , width,gutter), fill=(0, 0, 0))
     pos_x = 0
     gap = 2
