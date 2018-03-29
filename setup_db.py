@@ -65,11 +65,15 @@ conn.commit()
 
 # - Create tables to be populated by other scriptscursor.execute("""CREATE TABLE faculty
                     (id integer primary key autoincrement, name varchar unique, location varchar, department varchar, email varchar);""")
-# cursor.execute("""CREATE TABLE faculty_requests (name varchar);""")
-# cursor.execute("""CREATE TABLE faculty_retention (name text);""")
+cursor.execute("""CREATE TABLE faculty_requests
+                    (id integer primary key autoincrement, date datetime, faculty integer);""")
+cursor.execute("""CREATE TABLE book_requests
+                    (barcode integer primary key, request integer, personal boolean);""")
 conn.commit()
 
-cursor.execute("SELECT SUM(gg_recommended) FROM callnumbers WHERE assigned_to = 1;")
+cursor.execute("""SELECT SUM(callnumbers.gg_recommended) FROM callnumbers
+    INNER JOIN librarians ON librarians.id = callnumbers.assigned_to
+    WHERE librarians.name = 'Darren Poley';""")
 print (cursor.fetchall())
 
 conn.commit()
