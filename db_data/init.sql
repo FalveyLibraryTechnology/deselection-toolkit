@@ -11,73 +11,89 @@ DROP TABLE IF EXISTS posted_files;
 DROP TABLE IF EXISTS subjects;
 
 -- CREATE STATIC
-CREATE TABLE subjects
-(
-    id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    label VARCHAR
-);
-
-CREATE TABLE librarians
-(
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    name     VARCHAR,
-    initials VARCHAR(3)
-);
-
 CREATE TABLE callnumber_sections
 (
-    section          VARCHAR(3) PRIMARY KEY,
+    cn_section       VARCHAR(3) PRIMARY KEY,
     collection_count INTEGER,
     gg_recommended   INTEGER,
     reviewed_count   INTEGER,
-    assigned_to      INTEGER,
-    subject          INTEGER
+    -- CONNECTIONS
+    librarian_id     INTEGER,
+    subject_id       INTEGER
 );
 
 CREATE TABLE excluded_sets
 (
-    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    set_id INTEGER PRIMARY KEY AUTOINCREMENT,
     reason TEXT
 );
 
 CREATE TABLE excluded_barcodes
 (
     barcode INTEGER,
-    set_id  INTEGER
+    -- CONNECTIONS
+    set_id  INTEGER,
+
+    PRIMARY KEY (barcode, set_id)
 );
 
-CREATE TABLE posted_files
+CREATE TABLE librarians
 (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       VARCHAR,
-    created_by INTEGER,
-    section    VARCHAR(3)
+    librarian_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         VARCHAR,
+    initials     VARCHAR(3)
 );
 
 CREATE TABLE posted_books
 (
-    barcode INTEGER PRIMARY KEY AUTOINCREMENT,
-    file    INTEGER
+    barcode INTEGER PRIMARY KEY,
+    -- CONNECTIONS
+    file_id INTEGER
+);
+
+CREATE TABLE posted_files
+(
+    file_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name    VARCHAR,
+    -- CONNECTIONS
+    librarian_id INTEGER,
+    cn_section   VARCHAR(3),
+    month        DATE
+);
+
+CREATE TABLE sections_subjects
+(
+    subject_id INTEGER,
+    cn_section VARCHAR(3),
+
+    PRIMARY KEY (subject_id, cn_section)
+);
+
+CREATE TABLE subjects
+(
+    subject_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    label         VARCHAR
 );
 
 -- CREATE DYNAMIC
 CREATE TABLE faculty
 (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    faculty_id INTEGER PRIMARY KEY AUTOINCREMENT,
     name       VARCHAR,
     location   VARCHAR,
     department VARCHAR
 );
 CREATE TABLE faculty_request
 (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    date    DATETIME,
-    faculty INTEGER
+    request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date       DATETIME,
+    -- CONNECTIONS
+    faculty_d INTEGER
 );
 
 CREATE TABLE faculty_book
 (
-    barcode  INTEGER PRIMARY KEY AUTOINCREMENT,
-    request  INTEGER,
-    personal BOOLEAN
+    barcode    INTEGER PRIMARY KEY,
+    request_id INTEGER,
+    personal   BOOLEAN
 );

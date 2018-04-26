@@ -16,6 +16,9 @@ cursor = conn.cursor()
 cursor.executescript(init_sql)
 conn.commit()
 
+def make_unique(arr):
+    return list(set(filter(None, arr)))
+
 def loadSubjects():
     print ("Create subjects...")
     subjects = {}
@@ -47,20 +50,22 @@ def loadCallnumbers(librarians, subjects):
     print ("\tactive_callnumbers.txt")
     all_callnumbers = open("db_data/active_callnumbers.txt").read().split("\n")
     for cn in all_callnumbers:
-        if cn.startswith(sec):
-            if sec in callnumber_counts:
-                callnumber_counts[sec]["collection"] += 1
-            else:
-                callnumber_counts[sec] = { "collection": 1, "recommended": 0 }
-            break
+        for sec in sections:
+            if cn.startswith(sec):
+                if sec in callnumber_counts:
+                    callnumber_counts[sec]["collection"] += 1
+                else:
+                    callnumber_counts[sec] = { "collection": 1, "recommended": 0 }
+                break
     del all_callnumbers
     # Greenglass Recommendation counts
     print ("\tgg_callnumbers.txt")
     gg_callnumbers = open("db_data/gg_callnumbers.txt").read().split("\n")
     for cn in gg_callnumbers:
-        if cn.startswith(sec):
-            callnumber_counts[sec]["recommended"] += 1
-            break
+        for sec in sections:
+            if cn.startswith(sec):
+                callnumber_counts[sec]["recommended"] += 1
+                break
     del gg_callnumbers
 
     for section in callnumber_counts:
@@ -75,7 +80,7 @@ def loadCallnumbers(librarians, subjects):
             print ("missing", section)
             break
         cursor.execute(
-            "INSERT INTO callnumber_sections(section, collection_count, gg_recommended, subject, assigned_to) VALUES (?,?,?,?,?);",
+            "INSERT INTO callnumber_sections(cn_section, collection_count, gg_recommended, subject_id, librarian_id) VALUES (?,?,?,?,?);",
             (section, callnumber_counts[section]["collection"], callnumber_counts[section]["recommended"], subject, assigned_to)
         )
     conn.commit()
@@ -88,6 +93,7 @@ def loadExcludedSets():
         print ("\t%s" % file)
         lines = open(os.path.join(excluded_path, file), "r").read().split("\n")
         reason = lines.pop(0).strip()
+        lines = make_unique(lines)
         print("\t\t%s" % reason)
         cursor.execute("INSERT INTO excluded_sets (reason) VALUES (?)", (reason,))
         set_id = cursor.lastrowid

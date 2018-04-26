@@ -13,7 +13,7 @@ csv.field_size_limit(sys.maxsize)
 
 # Make sure missing barcodes aren't just checked out
 CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("../checked_out/checkedout_since_greenglass.txt").read().split("\n")]
-GG_CALLNUMBERS = open("../gg_archive/gg_callnumbers.txt", "r").read().split("\n")
+GG_CALLNUMBERS = open("../db_data/gg_callnumbers.txt", "r").read().split("\n")
 
 # Load map of barcodes to callnumber sections
 BARCODE_CN_MAP = json.load(open("../db_data/barcode_cn_map.json", "r"))
@@ -201,9 +201,14 @@ def parse_request(row):
         blines = bt.split('\n')
         barcode = blines[0].strip()
 
+        # Skip if excluded
+        c.execute("SELECT 1 FROM excluded_barcodes WHERE barcode=?", (barcode,request_id))
+        if c.fetchone() is not None:
+            continue
+
         # Skip if in database
         c.execute("SELECT 1 FROM book_requests WHERE barcode=? AND request=?", (barcode,request_id))
-        if c.fetchone():
+        if c.fetchone() is not None:
             continue
 
         while blines[bc] != 'Destination:':
