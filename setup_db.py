@@ -3,7 +3,8 @@ import os
 import re
 import sqlite3
 
-from src.posted_files import parse_source_dir
+from src.posted_files import parse_source_dir, SECTIONS
+from src.utils import make_unique
 
 # Check if exists
 if os.path.exists("database.sqlite"):
@@ -17,9 +18,6 @@ conn = sqlite3.connect("database.sqlite")
 cursor = conn.cursor()
 cursor.executescript(init_sql)
 conn.commit()
-
-def make_unique(arr):
-    return list(set(filter(None, arr)))
 
 def loadSubjects():
     print ("Create subjects...")
@@ -42,17 +40,15 @@ def loadLibrarians():
     return librarians
 
 def loadCallnumbers(librarians, subjects):
+    global SECTIONS
+
     print ("\nCreate callnumbers...")
-    sections = []
-    for initials in librarians:
-        sections.extend(librarians[initials]["assignment"])
-    sections.sort(key=lambda s: len(s), reverse=True) # longest first
     callnumber_counts = {}
     # Collection counts
     print ("\tactive_callnumbers.txt")
     all_callnumbers = open("db_data/active_callnumbers.txt").read().split("\n")
     for cn in all_callnumbers:
-        for sec in sections:
+        for sec in SECTIONS:
             if cn.startswith(sec):
                 if sec in callnumber_counts:
                     callnumber_counts[sec]["collection"] += 1
@@ -64,7 +60,7 @@ def loadCallnumbers(librarians, subjects):
     print ("\tgg_callnumbers.txt")
     gg_callnumbers = open("db_data/gg_callnumbers.txt").read().split("\n")
     for cn in gg_callnumbers:
-        for sec in sections:
+        for sec in SECTIONS:
             if cn.startswith(sec):
                 callnumber_counts[sec]["recommended"] += 1
                 break
@@ -112,18 +108,26 @@ def loadPostedFiles(librarians):
         print ("\t%s" % month)
         month_files = parse_source_dir(dir)
         for file in month_files:
+            file_id = -1
             for initials in librarians:
                 if ("_%s_" % initials) in file["name"]:
                     cursor.execute(
-                        "INSERT INTO posted_files (name, librarian_id, month) VALUES (?,?,?)",
-                        (file["name"], librarians[initials]["id"], month)
+                        "INSERT INTO posted_files (name, cn_section, librarian_id, month) VALUES (?,?,?,?)",
+                        (file["name"], file["cn_section"], librarians[initials]["id"], month)
                     )
+                    file_id = cursor.lastrowid
                     break
+            for book in file["books"]:
+                cursor.execute(
+                    "INSERT INTO posted_books (barcode, file_id) VALUES (?,?)",
+                    (int(book["barcode"]), file_id)
+                )
+    conn.commit()
 
 subjects = loadSubjects()
 librarians = loadLibrarians()
-loadCallnumbers(librarians, subjects)
 loadExcludedSets()
 loadPostedFiles(librarians)
+loadCallnumbers(librarians, subjects)
 
 conn.close()

@@ -1,3 +1,5 @@
+import datetime
+
 def parse_request(row):
     request = {}
     lines = row[4].split('\n')

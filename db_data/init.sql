@@ -57,8 +57,8 @@ CREATE TABLE posted_files
     name    VARCHAR,
     -- CONNECTIONS
     librarian_id INTEGER,
-    month        DATE
-    -- cn_section   VARCHAR(3)
+    month        DATE,
+    cn_section   VARCHAR(3)
 );
 
 CREATE TABLE sections_subjects
@@ -71,8 +71,8 @@ CREATE TABLE sections_subjects
 
 CREATE TABLE subjects
 (
-    subject_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    label         VARCHAR
+    subject_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label      VARCHAR
 );
 
 -- CREATE DYNAMIC
@@ -83,18 +83,22 @@ CREATE TABLE faculty
     address    VARCHAR,
     department VARCHAR
 );
-CREATE TABLE faculty_request
+CREATE TABLE faculty_requests
 (
     request_id INTEGER PRIMARY KEY AUTOINCREMENT,
     date       DATETIME,
     -- CONNECTIONS
-    faculty_d INTEGER
+    faculty_id INTEGER
 );
 
-CREATE TABLE faculty_book
+CREATE TABLE faculty_books
 (
-    barcode    INTEGER PRIMARY KEY,
+    barcode  INTEGER,
+    personal BOOLEAN,
+    comment  VARCHAR,
+
+    -- CONNECTIONS
     request_id INTEGER,
-    personal   BOOLEAN,
-    comment    VARCHAR
+
+    PRIMARY KEY (barcode, request_id)
 );

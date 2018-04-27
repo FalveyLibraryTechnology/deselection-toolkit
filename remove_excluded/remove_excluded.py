@@ -42,6 +42,8 @@ try:
         ws.Name = "%s_updated" % ws.Name[0:32] # limit length
 
         parsed_file = parse_source_file(os.path.abspath(stat.path))
+        if parsed_file is None:
+            continue
         remove = []
         index = 2
         for book in parsed_file["books"]:

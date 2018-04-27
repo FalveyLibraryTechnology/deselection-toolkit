@@ -3,11 +3,27 @@ import re
 
 from xlrd import open_workbook  # Excel files
 
-from .utils import normalize_callnumber
+from .utils import make_unique, normalize_callnumber
+
+SECTIONS = ["DAW", "DJK", "QA", "QB", "QC", "QD", "QE", "SB", "SD", "SF", "SH", "SK", "TA", "TC", "TD", "TE", "TF", "TG", "TH", "TJ", "TK", "TL", "TN", "TP", "TS", "TT", "TX", "BL", "BM", "BP", "BQ", "BR", "BS", "BT", "BV", "BX", "PA", "ZA", "JA", "JC", "JF", "JJ", "JK", "JL", "JN", "JQ", "JS", "JV", "JX", "JZ", "CB", "CC", "CD", "CE", "CJ", "CN", "CR", "CS", "CT", "DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DJ", "DK", "DP", "DQ", "DR", "DS", "DT", "DU", "DX", "GN", "GR", "GT", "GV", "HM", "HN", "HQ", "HS", "HT", "HV", "HX", "NA", "NB", "NC", "ND", "NE", "NK", "NX", "TR", "HA", "HB", "HC", "HD", "HE", "HF", "HG", "BF", "GA", "GB", "GC", "GE", "GF", "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LJ", "LT", "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "VA", "VB", "VC", "VD", "VE", "VF", "VG", "VK", "VM", "BC", "BD", "BH", "QH", "QK", "QL", "QM", "QP", "QR", "RA", "RB", "RC", "RD", "RE", "RF", "RG", "RJ", "RK", "RL", "RM", "RS", "RT", "RV", "RX", "RZ", "BJ", "PE", "PB", "PC", "PD", "PF", "PG", "PH", "PJ", "PK", "PL", "PM", "PQ", "PN", "PR", "PS", "PT", "A", "Q", "S", "T", "J", "C", "D", "E", "F", "N", "Z", "H", "K", "G", "L", "U", "V", "B", "R", "M", "P"]
 
 def parse_source_file(filename):
+    global SECTIONS
+
+    # Get callnumber section
+    path = filename.split("\\")
+    try:
+        cn_section = re.search("^([A-Z]+)", path[len(path) - 1]).group(1)
+    except AttributeError as e:
+        print ("Make sure %s isn't open in Excel (Skipping)" % path[len(path) - 1])
+        return None
+    for sec in SECTIONS:
+        if cn_section.startswith(sec):
+            cn_section = sec
+
     posted_file = {
-        "name": filename
+        "name": path[len(path) - 1],
+        "cn_section": cn_section
     }
     with open_workbook(filename) as excel_book:
         sheet = excel_book.sheet_by_index(0)
@@ -28,15 +44,12 @@ def parse_source_file(filename):
                     print ("x\t%s:" % filename)
                     print ("x\t%s" % (i, rvalues[i]))
                     raise Error("Invalid columns")
-
-        path = filename.split("\\")
-        check_letter = re.search("^([A-Z]+)", path[len(path) - 1]).group(1)
-        print (check_letter)
         books = []
         for row in range(1, sheet.nrows):
             rvalues = sheet.row_values(row)
-            # print (check_letter, rvalues[books_columns["callnumber"]])
-            if not rvalues[books_columns["callnumber"]].startswith(check_letter):
+            if rvalues[books_columns["barcode"]] == "":
+                continue
+            if not rvalues[books_columns["callnumber"]].startswith(cn_section):
                 continue
             book = {}
             for key in books_columns:
@@ -55,6 +68,8 @@ def parse_source_dir(month_dir):
     for dirpath, dirnames, filenames in os.walk(month_dir):
         for filename in filenames:
             parsed_file = parse_source_file(os.path.join(dirpath, filename))
+            if parsed_file is None:
+                continue
             parsed_file["month"] = month_dir
             posted_files.append(parsed_file)
     return posted_files
