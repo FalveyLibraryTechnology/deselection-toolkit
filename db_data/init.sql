@@ -57,8 +57,8 @@ CREATE TABLE posted_files
     name    VARCHAR,
     -- CONNECTIONS
     librarian_id INTEGER,
-    cn_section   VARCHAR(3),
     month        DATE
+    -- cn_section   VARCHAR(3)
 );
 
 CREATE TABLE sections_subjects
@@ -80,7 +80,7 @@ CREATE TABLE faculty
 (
     faculty_id INTEGER PRIMARY KEY AUTOINCREMENT,
     name       VARCHAR,
-    location   VARCHAR,
+    address    VARCHAR,
     department VARCHAR
 );
 CREATE TABLE faculty_request
@@ -95,5 +95,6 @@ CREATE TABLE faculty_book
 (
     barcode    INTEGER PRIMARY KEY,
     request_id INTEGER,
-    personal   BOOLEAN
+    personal   BOOLEAN,
+    comment    VARCHAR
 );
