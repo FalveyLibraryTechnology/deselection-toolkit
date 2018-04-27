@@ -3,6 +3,8 @@ import os
 import re
 import sqlite3
 
+from src.posted_files import parse_source_dir
+
 # Check if exists
 if os.path.exists("database.sqlite"):
     os.remove("database.sqlite") # debug
@@ -102,9 +104,26 @@ def loadExcludedSets():
             cursor.execute("INSERT INTO excluded_barcodes (barcode, set_id) VALUES (?,?)", (barcode, set_id))
     conn.commit()
 
+def loadPostedFiles(librarians):
+    print ("\nLoading Posted Files...")
+    weeding_dirs = [dir.path for dir in os.scandir("sources/") if dir.is_dir()]
+    for dir in weeding_dirs:
+        month = dir.split("/")[1]
+        print ("\t%s" % month)
+        month_files = parse_source_dir(dir)
+        for file in month_files:
+            for initials in librarians:
+                if ("_%s_" % initials) in file["name"]:
+                    cursor.execute(
+                        "INSERT INTO posted_files (name, librarian_id, month) VALUES (?,?,?)",
+                        (file["name"], librarians[initials]["id"], month)
+                    )
+                    break
+
 subjects = loadSubjects()
 librarians = loadLibrarians()
 loadCallnumbers(librarians, subjects)
 loadExcludedSets()
+loadPostedFiles(librarians)
 
 conn.close()
