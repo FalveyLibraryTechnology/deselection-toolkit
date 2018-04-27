@@ -1,7 +1,4 @@
 # Output folders
-checked_out/out/
-checked_out/*.txt
-checked_out/*.xlsx
 hashes/
 reports/
 split_logs/out/
@@ -12,6 +9,9 @@ sources/
 Archive/
 *.csv
 *.json
+remove_excluded/out/
+remove_excluded/*.txt
+remove_excluded/*.xlsx
 
 # Villanova Content
 adjustments/
