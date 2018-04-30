@@ -26,7 +26,7 @@ if not os.path.exists("out/"):
 excel = win32.gencache.EnsureDispatch("Excel.Application")
 
 try:
-    excel_files = [file for file in os.scandir(".") if file.is_file() and file.name[-4:] == "xlsx"]
+    excel_files = [file for file in os.scandir("src/") if file.is_file() and file.name[-4:] == "xlsx"]
     for stat in excel_files:
         source_name = stat.name
         parts = source_name[0:-5].split("_")
@@ -78,9 +78,8 @@ finally:
     print (" - closing Excel")
     excel.Application.Quit()
     print (" - closed")
-    log_file = open("./out/remove_checkedout_report.txt", "w")
-    log_file.write(time.asctime(time.localtime(time.time())))
-    log_file.write("\n")
+    log_file = open("./remove_checkedout.log", "a")
+    log_file.write("\n\n--------------\n%s\n" % time.asctime(time.localtime(time.time())))
     log_file.write(log_text)
 
     conn.close()
