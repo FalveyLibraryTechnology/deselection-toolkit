@@ -46,7 +46,11 @@ CREATE TABLE librarians
 
 CREATE TABLE posted_books
 (
-    barcode INTEGER PRIMARY KEY,
+    barcode    INTEGER PRIMARY KEY,
+    callnumber VARCHAR,
+    title      VARCHAR,
+    author     VARCHAR,
+    pub_year   TINYINT,
     -- CONNECTIONS
     file_id INTEGER
 );
