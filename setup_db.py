@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import datetime # must be after sqlite3
 
 from src.posted_files import parse_source_dir, SECTIONS
 from src.utils import make_unique
@@ -111,9 +112,10 @@ def loadPostedFiles(librarians):
             file_id = -1
             for initials in librarians:
                 if ("_%s_" % initials) in file["name"]:
+                    month_date = datetime.datetime.strptime(month, "%B %Y")
                     cursor.execute(
                         "INSERT INTO posted_files (name, cn_section, librarian_id, month) VALUES (?,?,?,?)",
-                        (file["name"], file["cn_section"], librarians[initials]["id"], month)
+                        (file["name"], file["cn_section"], librarians[initials]["id"], month_date)
                     )
                     file_id = cursor.lastrowid
                     break

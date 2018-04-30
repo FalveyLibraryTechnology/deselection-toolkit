@@ -1,7 +1,6 @@
 import csv
 import json
 import os
-import progressbar
 import re
 import sqlite3
 import sys
@@ -30,9 +29,10 @@ def addNewPostedFile():
                 file = parse_source_file(os.path.exists(os.path.join(dir, filename)))
                 for initials in librarians:
                     if ("_%s_" % initials) in file["name"]:
+                        month_date = datetime.datetime.strptime(month, "%B %Y")
                         cursor.execute(
                             "INSERT INTO posted_files (name, librarian_id, month) VALUES (?,?,?)",
-                            (file["name"], file["cn_section"], librarians[initials]["id"], month)
+                            (file["name"], file["cn_section"], librarians[initials]["id"], month_date)
                         )
                         file_id = cursor.lastrowid
                         break
