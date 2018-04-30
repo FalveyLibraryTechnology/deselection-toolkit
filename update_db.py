@@ -109,54 +109,9 @@ print (cursor.fetchall())
 
 exit(0)
 
-# TODO: CLean up
-
-'''
-# Make sure missing barcodes aren't just checked out
-CHECKED_OUT_BARCODES = [str(int(x.strip())) for x in open("../checked_out/checkedout_since_greenglass.txt").read().split("\n")]
-GG_CALLNUMBERS = open("../db_data/gg_callnumbers.txt", "r").read().split("\n")
-
-# Load map of barcodes to callnumber sections
-BARCODE_CN_MAP = json.load(open("../db_data/barcode_cn_map.json", "r"))
-POSTED_CN_MAP = json.load(open("../db_data/posted_cn_map.json", "r"))
-POSTED_COUNTS = {}
-REVIEWED_COUNTS = {}
-
-
-POSTED_BARCODES = []
-weeding_dirs = [dir.path for dir in os.scandir("sources/") if dir.is_dir()]
-print ("Updating Weeding Data...")
-for dir in weeding_dirs:
-    print (dir)
-    parse_crtf_dir(dir)
-
 # Callnumbers reviewed
-c = conn.cursor()
-for section in POSTED_COUNTS:
-    c.execute("UPDATE callnumbers SET posted_count=? WHERE section=?", (POSTED_COUNTS[section], section))
-for section in REVIEWED_COUNTS:
-    c.execute("UPDATE callnumbers SET reviewed_count=? WHERE section=?", (REVIEWED_COUNTS[section], section))
-
-print ("\nParsing Requests...")
-file = csv.reader(open("db_data/faculty_requests.csv", encoding="utf-8"))
-form_rows = []
-header = True
-for row in file:
-    if header: # skip header
-        header = False
-        continue
-    form_rows.append(row)
-# Sort by date
-form_rows.sort(key=lambda r: datetime.datetime.strptime(r[0], "%b %d, %Y, %I:%M:%S %p"))
-# Parse all requests
-bar = progressbar.ProgressBar(max_value=len(form_rows))
-index = 0
-for row in form_rows:
-    parse_request(row)
-    index += 1
-    bar.update(index)
-bar.finish()
-
-conn.commit()
-conn.close()
-'''
+# c = conn.cursor()
+# for section in POSTED_COUNTS:
+#     c.execute("UPDATE callnumbers SET posted_count=? WHERE section=?", (POSTED_COUNTS[section], section))
+# for section in REVIEWED_COUNTS:
+#     c.execute("UPDATE callnumbers SET reviewed_count=? WHERE section=?", (REVIEWED_COUNTS[section], section))
