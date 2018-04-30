@@ -9,7 +9,7 @@ import datetime # must be after sqlite3
 
 from xlrd import open_workbook  # Excel files
 
-from src.posted_files import parse_source_dir
+from src.posted_files import parse_source_file
 from src.log_parsing import parse_request
 
 csv.field_size_limit(sys.maxsize)
@@ -22,12 +22,12 @@ def addNewPostedFile():
     weeding_dirs = [dir.path for dir in os.scandir("sources/") if dir.is_dir()]
     for dir in weeding_dirs:
         month = dir.split("/")[1]
-        cursor.execute("SELECT 1 FROM posted_files WHERE month=?", (month,))
-        # TODO: Do on a file to file basis
-        if cursor.fetchone() is None:
-            print ("\t+ %s" % dir)
-            month_files = parse_source_dir(dir)
-            for file in month_files:
+        month_files = [file.name for file in os.scandir(dir) if file.is_file()]
+        for filename in month_files:
+            cursor.execute("SELECT 1 FROM posted_files WHERE name=?", (filename,))
+            if cursor.fetchone() is None:
+                print ("\t+ %s" % filename)
+                file = parse_source_file(os.path.exists(os.path.join(dir, filename)))
                 for initials in librarians:
                     if ("_%s_" % initials) in file["name"]:
                         cursor.execute(
