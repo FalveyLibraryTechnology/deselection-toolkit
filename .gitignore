@@ -9,14 +9,16 @@ sources/
 Archive/
 *.csv
 *.json
-remove_excluded/out/
+db_data/**/*.txt
+remove_excluded/*.log
 remove_excluded/*.txt
-remove_excluded/*.xlsx
+remove_excluded/**/*.xlsx
 
 # Villanova Content
 adjustments/
 split_logs/input.csv
 split_logs/raw-log
+villanova/
 
 # Python
 __pycache__/
