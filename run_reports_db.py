@@ -9,24 +9,91 @@ import sqlite3
 conn = sqlite3.connect("database.sqlite")
 cursor = conn.cursor()
 
-def queryForAllFacultyReserved(month_date):
+def writeCSVFile(filename, month, columns, data):
+    with open("db_reports/%s/%s" % (month, filename), "w", newline="", encoding="utf8") as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(columns)
+        writer.writerows(data)
+
+def queryForAllFacultyRequests(month_date):
     cursor.execute("""
-        SELECT posted_books.barcode, MIN(faculty_books.personal), MIN(faculty_requests.date), posted_files.month from posted_books
-            LEFT JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
+        SELECT posted_books.barcode, posted_books.callnumber, posted_books.title, posted_books.author, posted_books.pub_year, faculty.name, faculty_books.personal, faculty_requests.date
+            FROM posted_books
+            INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
             INNER JOIN faculty_requests ON faculty_requests.request_id = faculty_books.request_id
+            INNER JOIN faculty ON faculty.faculty_id = faculty_requests.faculty_id
+            INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
+            WHERE posted_files.month = ?
+            ORDER BY faculty_books.barcode ASC, faculty_requests.date ASC""", (month_date, ))
+    return cursor.fetchall()
+
+def queryForAllFacultyEffective(month_date):
+    cursor.execute("""
+        SELECT posted_books.barcode, posted_books.callnumber, posted_books.title, posted_books.author, posted_books.pub_year, faculty.name, faculty_books.personal
+            FROM posted_books
+            INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
+            INNER JOIN faculty_requests ON faculty_requests.request_id = faculty_books.request_id
+            INNER JOIN faculty ON faculty.faculty_id = faculty_requests.faculty_id
             INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
             WHERE posted_files.month = ?
             GROUP BY faculty_books.barcode
-            ORDER BY faculty_books.barcode ASC""", (month_date, ))
+            ORDER BY faculty_books.barcode ASC, faculty_books.personal ASC, faculty_requests.date ASC""", (month_date, ))
     return cursor.fetchall()
 
+def queryForPersonalEffective(month_date):
+    cursor.execute("""
+        SELECT posted_books.callnumber, faculty.name, faculty.address, posted_books.title, posted_books.author, posted_books.pub_year, posted_books.barcode
+            FROM posted_books
+            INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
+            INNER JOIN faculty_requests ON faculty_requests.request_id = faculty_books.request_id
+            INNER JOIN faculty ON faculty.faculty_id = faculty_requests.faculty_id
+            INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
+            WHERE posted_files.month = ?
+                AND NOT EXISTS(SELECT 1 FROM faculty_books WHERE personal = 0 AND barcode = posted_books.barcode)
+            GROUP BY faculty_books.barcode
+            ORDER BY posted_books.callnumber_sort ASC, faculty_requests.date ASC""", (month_date, ))
+    return cursor.fetchall()
+
+def queryForMasterList(month_date):
+    cursor.execute("""
+        SELECT posted_books.callnumber, posted_books.title, posted_books.author, posted_books.pub_year, posted_books.barcode
+            FROM posted_books
+            INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
+            WHERE posted_files.month = ?
+                AND NOT EXISTS(SELECT 1 FROM faculty_books WHERE barcode = posted_books.barcode)
+            ORDER BY posted_books.callnumber_sort ASC""", (month_date, ))
+    return cursor.fetchall()
 
 months = [dir.path.split("/")[1] for dir in os.scandir("sources/") if dir.is_dir()]
 for month in months:
-    print (month)
+    print ("\t%s" % month)
     month_date = datetime.datetime.strptime(month, "%B %Y")
-    faculty_reserved = queryForAllFacultyReserved(month_date)
-    print (faculty_reserved)
+    if not os.path.exists("db_reports/%s/" % month):
+        os.mkdir("db_reports/%s/" % month)
+    # Faculty All Requests
+    writeCSVFile(
+        "faculty-all-requests.csv", month,
+        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal", "Request Date"],
+        queryForAllFacultyRequests(month_date)
+    )
+    # Faculty Effective
+    writeCSVFile(
+        "faculty-effective-requests.csv", month,
+        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal"],
+        queryForAllFacultyEffective(month_date)
+    )
+    # Personal Retention Effective
+    writeCSVFile(
+        "faculty-requests-for-personal-collections.csv", month,
+        ["Callnumber", "Faculty Name", "Faculty Address", "Title", "Author", "Publish Year", "Barcode"],
+        queryForPersonalEffective(month_date)
+    )
+    # Master Pull List
+    writeCSVFile(
+        "master-pull-list.csv", month,
+        ["Callnumber", "Title", "Author", "Publish Year", "Barcode"],
+        queryForMasterList(month_date)
+    )
 
 exit(0)
 
