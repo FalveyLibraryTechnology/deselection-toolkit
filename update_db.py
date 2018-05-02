@@ -112,8 +112,47 @@ def addNewRequests():
             included_barcodes.append(book["barcode"])
     conn.commit()
 
+def queryFileCallnumberTopBottom():
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT posted_files.cn_section, MIN(posted_books.callnumber_sort), MAX(posted_books.callnumber_sort)
+            FROM posted_books
+            INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
+            GROUP BY posted_files.file_id""")
+    return cursor.fetchall()
+
+def updateReviewedCounts():
+    print ("Updating Reviewed Counts...")
+    gg_callnumbers_norm = open("db_data/gg_callnumbers_norm.txt").read().split("\n")
+    file_ranges = queryFileCallnumberTopBottom()
+    # Some items not recommended by gg are added to posted lists
+    for range in file_ranges:
+        section, top, bottom = range
+        if not top in gg_callnumbers_norm:
+            gg_callnumbers_norm.append(top)
+        if not bottom in gg_callnumbers_norm:
+            gg_callnumbers_norm.append(bottom)
+    gg_callnumbers_norm.sort()
+    # Distance between top and bottom indexes is number reviewed
+    section_review_sums = {}
+    for range in file_ranges:
+        section, top, bottom = range
+        review_min = gg_callnumbers_norm.index(top)
+        review_max = gg_callnumbers_norm.index(bottom)
+        if section in section_review_sums:
+            section_review_sums[section] += review_max - review_min + 1 # inclusive
+        else:
+            section_review_sums[section] = review_max - review_min + 1
+    cursor = conn.cursor()
+    for section in section_review_sums:
+        cursor.execute(
+            "UPDATE callnumber_sections SET reviewed_count=? WHERE cn_section=?",
+            (section_review_sums[section], section)
+        )
+
 addNewPostedFile()
 addNewRequests()
+updateReviewedCounts()
 
 # Callnumbers reviewed
 # c = conn.cursor()

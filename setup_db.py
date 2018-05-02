@@ -5,7 +5,7 @@ import sqlite3
 import datetime # must be after sqlite3
 
 from src.posted_files import parse_source_dir, SECTIONS
-from src.utils import make_unique
+from src.utils import make_unique, normalize_callnumber
 
 # Check if exists
 if os.path.exists("database.sqlite"):
@@ -48,6 +48,7 @@ def loadCallnumbers(librarians, subjects):
     # Collection counts
     print ("\tactive_callnumbers.txt")
     all_callnumbers = open("db_data/active_callnumbers.txt").read().split("\n")
+    index = 0
     for cn in all_callnumbers:
         for sec in SECTIONS:
             if cn.startswith(sec):
@@ -56,15 +57,29 @@ def loadCallnumbers(librarians, subjects):
                 else:
                     callnumber_counts[sec] = { "collection": 1, "recommended": 0 }
                 break
+        # Save normalized for later
+        '''
+        all_callnumbers[index] = normalize_callnumber(cn)
+        index += 1
+    active_callnumbers = make_unique(all_callnumbers)
+    active_callnumbers.sort()
+    open("db_data/active_callnumbers_norm.txt", "w").write("\n".join(active_callnumbers))
+    '''
     del all_callnumbers
     # Greenglass Recommendation counts
     print ("\tgg_callnumbers.txt")
     gg_callnumbers = open("db_data/gg_callnumbers.txt").read().split("\n")
+    index = 0
     for cn in gg_callnumbers:
         for sec in SECTIONS:
             if cn.startswith(sec):
                 callnumber_counts[sec]["recommended"] += 1
                 break
+        gg_callnumbers[index] = normalize_callnumber(cn)
+        index += 1
+    gg_callnumbers = make_unique(gg_callnumbers)
+    gg_callnumbers.sort()
+    open("db_data/gg_callnumbers_norm.txt", "w").write("\n".join(gg_callnumbers))
     del gg_callnumbers
 
     for section in callnumber_counts:
