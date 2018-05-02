@@ -121,8 +121,8 @@ def loadPostedFiles(librarians):
                     break
             for book in file["books"]:
                 cursor.execute(
-                    "INSERT INTO posted_books (barcode, callnumber, title, author, pub_year, file_id) VALUES (?,?,?,?,?,?)",
-                    (int(book["barcode"]), book["callnumber"], book["title"], book["author"], book["year"], file_id)
+                    "INSERT INTO posted_books (barcode, callnumber, callnumber_sort, title, author, pub_year, file_id) VALUES (?,?,?,?,?,?,?)",
+                    (int(book["barcode"]), book["callnumber"], book["callnumber_sort"], book["title"], book["author"], book["year"], file_id)
                 )
     conn.commit()
 

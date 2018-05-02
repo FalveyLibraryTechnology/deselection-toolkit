@@ -46,11 +46,12 @@ CREATE TABLE librarians
 
 CREATE TABLE posted_books
 (
-    barcode    INTEGER PRIMARY KEY,
-    callnumber VARCHAR,
-    title      VARCHAR,
-    author     VARCHAR,
-    pub_year   TINYINT,
+    barcode         INTEGER PRIMARY KEY,
+    callnumber      VARCHAR,
+    callnumber_sort VARCHAR,
+    title           VARCHAR,
+    author          VARCHAR,
+    pub_year        TINYINT,
     -- CONNECTIONS
     file_id INTEGER
 );
@@ -85,7 +86,8 @@ CREATE TABLE faculty
     faculty_id INTEGER PRIMARY KEY AUTOINCREMENT,
     name       VARCHAR,
     address    VARCHAR,
-    department VARCHAR
+    department VARCHAR,
+    email      VARCHAR
 );
 CREATE TABLE faculty_requests
 (

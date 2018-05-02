@@ -54,11 +54,11 @@ def parse_source_file(filename):
                 continue
             book = {}
             for key in books_columns:
-                book[key] = str(rvalues[books_columns[key]]).split(".")[0]
-            # Special treatment
-            book["year"] = str(rvalues[books_columns["year"]]).split(".")[0]
-            book["callnumber"] = str(rvalues[books_columns["callnumber"]]).split(".")[0]
+                book[key] = rvalues[books_columns[key]]
+            # Special treatment (integers and sorting)
+            book["barcode"] = str(book["barcode"]).split(".")[0]
             book["callnumber_sort"] = normalize_callnumber(book["callnumber"])
+            book["year"] = str(book["year"]).split(".")[0]
             books.append(book)
     posted_file["books"] = books
     return posted_file

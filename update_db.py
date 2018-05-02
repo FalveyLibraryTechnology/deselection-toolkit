@@ -18,6 +18,10 @@ conn = sqlite3.connect("database.sqlite")
 def addNewPostedFile():
     print ("Updating Weeding Data...")
     cursor = conn.cursor()
+
+    cursor.execute("SELECT initials, librarian_id FROM librarians")
+    librarians = [{ "initials": row[0], "id": row[1] } for row in cursor.fetchall()]
+
     weeding_dirs = [dir.path for dir in os.scandir("sources/") if dir.is_dir()]
     for dir in weeding_dirs:
         month = dir.split("/")[1]
@@ -26,13 +30,13 @@ def addNewPostedFile():
             cursor.execute("SELECT 1 FROM posted_files WHERE name=?", (filename,))
             if cursor.fetchone() is None:
                 print ("\t+ %s" % filename)
-                file = parse_source_file(os.path.exists(os.path.join(dir, filename)))
-                for initials in librarians:
-                    if ("_%s_" % initials) in file["name"]:
+                file = parse_source_file(os.path.join(dir, filename))
+                for lib in librarians:
+                    if ("_%s_" % lib["initials"]) in file["name"]:
                         month_date = datetime.datetime.strptime(month, "%B %Y")
                         cursor.execute(
-                            "INSERT INTO posted_files (name, librarian_id, month) VALUES (?,?,?)",
-                            (file["name"], file["cn_section"], librarians[initials]["id"], month_date)
+                            "INSERT INTO posted_files (name, cn_section, librarian_id, month) VALUES (?,?,?,?)",
+                            (file["name"], file["cn_section"], lib["id"], month_date)
                         )
                         file_id = cursor.lastrowid
                         break
@@ -72,12 +76,11 @@ def addNewRequests():
             )
             faculty_id = cursor.lastrowid
         # Check for old requests
-        request_date = datetime.datetime.strptime(row[0], "%b %d, %Y, %I:%M:%S %p")
-        cursor.execute("SELECT 1 FROM faculty_requests WHERE faculty_id=? AND date=?", (faculty_id, request_date))
+        cursor.execute("SELECT 1 FROM faculty_requests WHERE faculty_id=? AND date=?", (faculty_id, request["date"]))
         if cursor.fetchone() is None:
             cursor.execute(
                 "INSERT INTO faculty_requests(faculty_id, date) VALUES (?,?);",
-                (faculty_id, request_date)
+                (faculty_id, request["date"])
             )
             request_id = cursor.lastrowid
             included_barcodes = []
@@ -90,6 +93,9 @@ def addNewRequests():
                     file_obj = cursor.fetchone()
                     print ("\tduplicate in this request: %s (%s)" % (book["barcode"], file_obj[0]))
                     continue
+                cursor.execute("SELECT 1 FROM posted_books WHERE barcode=?", (book["barcode"], ))
+                if cursor.fetchone() is None:
+                    print ("\tinvalid barcode: %s (%s)" % (book["barcode"], request["date"]))
                 cursor.execute(
                     "INSERT INTO faculty_books(barcode, personal, comment, request_id) VALUES (?,?,?,?);",
                     (book["barcode"], book["personal"], book["comment"], request_id)
@@ -99,15 +105,6 @@ def addNewRequests():
 
 addNewPostedFile()
 addNewRequests()
-
-cursor = conn.cursor()
-cursor.execute("""
-    SELECT posted_files.cn_section, COUNT(posted_books.barcode) from posted_files
-        INNER JOIN posted_books on posted_books.file_id = posted_files.file_id
-        GROUP BY posted_files.cn_section""", ())
-print (cursor.fetchall())
-
-exit(0)
 
 # Callnumbers reviewed
 # c = conn.cursor()
