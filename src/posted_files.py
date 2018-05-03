@@ -2,13 +2,14 @@ import os
 import re
 
 from xlrd import open_workbook  # Excel files
+from typing import Dict
 
-from .utils import make_unique, normalize_callnumber
+from .utils import normalize_callnumber
 
 SECTIONS = ["DAW", "DJK", "QA", "QB", "QC", "QD", "QE", "SB", "SD", "SF", "SH", "SK", "TA", "TC", "TD", "TE", "TF", "TG", "TH", "TJ", "TK", "TL", "TN", "TP", "TS", "TT", "TX", "BL", "BM", "BP", "BQ", "BR", "BS", "BT", "BV", "BX", "PA", "ZA", "JA", "JC", "JF", "JJ", "JK", "JL", "JN", "JQ", "JS", "JV", "JX", "JZ", "CB", "CC", "CD", "CE", "CJ", "CN", "CR", "CS", "CT", "DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DJ", "DK", "DP", "DQ", "DR", "DS", "DT", "DU", "DX", "GN", "GR", "GT", "GV", "HM", "HN", "HQ", "HS", "HT", "HV", "HX", "NA", "NB", "NC", "ND", "NE", "NK", "NX", "TR", "HA", "HB", "HC", "HD", "HE", "HF", "HG", "BF", "GA", "GB", "GC", "GE", "GF", "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LJ", "LT", "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "VA", "VB", "VC", "VD", "VE", "VF", "VG", "VK", "VM", "BC", "BD", "BH", "QH", "QK", "QL", "QM", "QP", "QR", "RA", "RB", "RC", "RD", "RE", "RF", "RG", "RJ", "RK", "RL", "RM", "RS", "RT", "RV", "RX", "RZ", "BJ", "PE", "PB", "PC", "PD", "PF", "PG", "PH", "PJ", "PK", "PL", "PM", "PQ", "PN", "PR", "PS", "PT", "A", "Q", "S", "T", "J", "C", "D", "E", "F", "N", "Z", "H", "K", "G", "L", "U", "V", "B", "R", "M", "P"]
 
 # TODO: Reviewed count
-def parse_source_file(filename):
+def parse_source_file(filename) -> Dict:
     global SECTIONS
 
     # Get callnumber section
@@ -44,7 +45,7 @@ def parse_source_file(filename):
                 for i in range(len(rvalues)):
                     print ("x\t%s:" % filename)
                     print ("x\t%s" % (i, rvalues[i]))
-                    raise Error("Invalid columns")
+                    raise ValueError("Invalid columns")
         books = []
         for row in range(1, sheet.nrows):
             rvalues = sheet.row_values(row)
@@ -62,15 +63,3 @@ def parse_source_file(filename):
             books.append(book)
     posted_file["books"] = books
     return posted_file
-
-def parse_source_dir(month_dir):
-    posted_files = []
-
-    for dirpath, dirnames, filenames in os.walk(month_dir):
-        for filename in filenames:
-            parsed_file = parse_source_file(os.path.join(dirpath, filename))
-            if parsed_file is None:
-                continue
-            parsed_file["month"] = month_dir
-            posted_files.append(parsed_file)
-    return posted_files

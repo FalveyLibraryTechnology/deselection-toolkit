@@ -1,4 +1,5 @@
 import re
+from .vendor.library_callnumber_lc import normalize
 
 def comma(num):
     return '{:,}'.format(num)
@@ -7,6 +8,7 @@ def make_unique(arr):
     return list(set(filter(None, arr)))
 
 def normalize_callnumber(callnumber):
+    return normalize(callnumber)
     try:
         section = re.search("^([A-Z]+)", callnumber).group(1)
         number_match = re.search("^[A-Z ]+([\d\.]+[ \.]*)", callnumber)
