@@ -83,21 +83,25 @@ def loadCallnumbers(librarians, subjects) -> None:
     del gg_callnumbers
     bar.finish()
 
-    for section in callnumber_counts:
-        # print ("\t%s: %d / %d" % (section, callnumber_counts[section]["recommended"], callnumber_counts[section]["collection"]))
-        subject = -1
+    for cn_section in callnumber_counts:
+        print (cn_section, callnumber_counts[cn_section])
+        subject_id = -1
         assigned_to = -1
         for initials in librarians:
-            if section in librarians[initials]["assignment"]:
-                subject = subjects[librarians[initials]["subject"]]
+            if cn_section in librarians[initials]["assignment"]:
+                subject_id = subjects[librarians[initials]["subject"]]
                 assigned_to = librarians[initials]["id"]
-        if subject == -1:
-            print("missing", section)
+                break
+        if subject_id == -1:
+            print("missing", cn_section)
             break
         cursor.execute(
-            "INSERT INTO callnumber_sections(cn_section, collection_count, gg_recommended, subject_id, librarian_id) VALUES (?,?,?,?,?);",
-            (section, callnumber_counts[section]["collection"], callnumber_counts[section]["recommended"], subject,
-             assigned_to)
+            "INSERT INTO callnumber_sections(cn_section, collection_count, gg_recommended, librarian_id) VALUES (?,?,?,?);",
+            (cn_section, callnumber_counts[cn_section]["collection"], callnumber_counts[cn_section]["recommended"], assigned_to)
+        )
+        cursor.execute(
+            "INSERT INTO sections_subjects(cn_section, subject_id) VALUES (?,?);",
+            (cn_section, subject_id)
         )
     conn.commit()
 

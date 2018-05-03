@@ -19,7 +19,6 @@ CREATE TABLE callnumber_sections
     reviewed_count   INTEGER,
     -- CONNECTIONS
     librarian_id     INTEGER,
-    subject_id       INTEGER
 );
 
 CREATE TABLE excluded_sets
