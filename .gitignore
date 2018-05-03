@@ -21,6 +21,7 @@ split_logs/raw-log
 villanova/
 
 # Python
+.idea/
 __pycache__/
 *.py[cod]
 *$py.class
