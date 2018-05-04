@@ -101,8 +101,8 @@ def createCollectionReview():
     as_of = datetime.datetime.strftime(datetime.datetime.now(), "%m/%d")
     outfile.write("Print Monograph Collection Review\n")
     outfile.write(
-        "Subject Area,# of Items in Subject Area,%% of Total Collection,%% of Total Monograph Collection (print & electonic),," +
-        "# of Items in Subject Area Identified for Review by Greenglass,%% of Subject Area Identified for Review by Greenglass,," +
+        "Subject Area,# of Items in Subject Area,% of Total Collection,% of Total Monograph Collection (print & electonic),," +
+        "# of Items in Subject Area Identified for Review by Greenglass,% of Subject Area Identified for Review by Greenglass,," +
         "# of Items Reviewed In Subject Area (as of %s),%% of Identified Items Reviewed in Subject Area (as of %s)," % (as_of, as_of)+
         "# of Reviewed Items Retained by Librarians (as of %s),%% of Reviewed Items Retained by Librarians\n" % as_of)
     index = 0
@@ -118,7 +118,7 @@ def createCollectionReview():
             )
         )
         index += 1
-    outfile.write("\n\n\nSubject Area,# of Items in Subject Area,%% of Total  Collection,% of Total Monograph Collection (print & electonic),," +
+    outfile.write("\n\n\nSubject Area,# of Items in Subject Area,% of Total  Collection,% of Total Monograph Collection (print & electonic),," +
                   "# of Items in Subject Area to be Retained (as of %s),# of Items in Subject Area Remaining to be Reviewed (as of %s),," % (as_of, as_of)+
                   "%% of Items in Subject Area to be Retained (as of %s)\n" % as_of)
     index = 0
@@ -127,7 +127,7 @@ def createCollectionReview():
         label, posted_counts, faculty_count = book_counts[index]
         librarian_retained = reviewed_count - posted_counts
         outfile.write(
-            "%s,%d,%.5f,,,%d,%.5f,,%.5f\n" % (
+            "%s,%d,%.5f,,,%d,%d,,%.5f\n" % (
                 label.strip(), collection_count, collection_count / COLLECTION_COUNT,
                 collection_count - (gg_recommended - librarian_retained - faculty_count), gg_recommended - reviewed_count,
                 (collection_count - (gg_recommended - librarian_retained - faculty_count)) / collection_count,
