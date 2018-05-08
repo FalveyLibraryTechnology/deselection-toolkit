@@ -19,6 +19,8 @@ CREATE TABLE callnumber_sections
     reviewed_count   INTEGER,
     -- CONNECTIONS
     librarian_id     INTEGER,
+
+    FOREIGN KEY(librarian_id) REFERENCES librarians(librarian_id)
 );
 
 CREATE TABLE excluded_sets
@@ -33,7 +35,10 @@ CREATE TABLE excluded_barcodes
     -- CONNECTIONS
     set_id  INTEGER,
 
-    PRIMARY KEY (barcode, set_id)
+    PRIMARY KEY(barcode, set_id),
+
+    FOREIGN KEY(set_id) REFERENCES excluded_sets(set_id)
+
 );
 
 CREATE TABLE librarians
@@ -52,17 +57,22 @@ CREATE TABLE posted_books
     author          VARCHAR,
     pub_year        TINYINT,
     -- CONNECTIONS
-    file_id INTEGER
+    file_id         INTEGER,
+
+    FOREIGN KEY(file_id) REFERENCES posted_files(file_id)
 );
 
 CREATE TABLE posted_files
 (
     file_id INTEGER PRIMARY KEY AUTOINCREMENT,
     name    VARCHAR,
+    month   DATE,
     -- CONNECTIONS
     librarian_id INTEGER,
-    month        DATE,
-    cn_section   VARCHAR(3)
+    cn_section   VARCHAR(3),
+
+    FOREIGN KEY(librarian_id) REFERENCES librarians(librarian_id),
+    FOREIGN KEY(cn_section) REFERENCES callnumber_sections(cn_section)
 );
 
 CREATE TABLE sections_subjects
@@ -70,7 +80,7 @@ CREATE TABLE sections_subjects
     subject_id INTEGER,
     cn_section VARCHAR(3),
 
-    PRIMARY KEY (subject_id, cn_section)
+    PRIMARY KEY(subject_id, cn_section)
 );
 
 CREATE TABLE subjects
@@ -93,7 +103,9 @@ CREATE TABLE faculty_requests
     request_id INTEGER PRIMARY KEY AUTOINCREMENT,
     date       DATETIME,
     -- CONNECTIONS
-    faculty_id INTEGER
+    faculty_id INTEGER,
+
+    FOREIGN KEY(faculty_id) REFERENCES faculty(faculty_id)
 );
 
 CREATE TABLE faculty_books
@@ -101,9 +113,10 @@ CREATE TABLE faculty_books
     barcode  INTEGER,
     personal BOOLEAN,
     comment  VARCHAR,
-
     -- CONNECTIONS
     request_id INTEGER,
 
-    PRIMARY KEY (barcode, request_id)
+    PRIMARY KEY(barcode, request_id),
+
+    FOREIGN KEY(request_id) REFERENCES requests(request_id)
 );
