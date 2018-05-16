@@ -1,11 +1,11 @@
 import json
 import progressbar
 import sqlite3
+import src.posted_files as posted_files
 
 from typing import Dict
 
 from src.database_defs import *
-from src.posted_files import SECTIONS
 from src.utils import make_unique, normalize_callnumber
 
 # Check if exists
@@ -20,7 +20,7 @@ cursor.executescript(init_sql)
 conn.commit()
 
 
-def loadSubjects() -> Dict:
+def load_subjects() -> Dict:
     print("\nCreate subjects...")
     subjects = {}
     for label in open("db_data/subject_list.txt", "r"):
@@ -31,20 +31,23 @@ def loadSubjects() -> Dict:
     return subjects
 
 
-def loadLibrarians() -> Dict:
+def load_librarians() -> Dict:
     print("\nCreate librarians...")
     librarians = json.load(open("db_data/librarians.json", "r"))  # librarian data by initial
     for initials in librarians:
         cursor.execute("INSERT INTO librarians(initials, name) VALUES (?,?);", (initials, librarians[initials]["name"]))
         print("\t", librarians[initials]["name"], cursor.lastrowid)
         librarians[initials]["id"] = cursor.lastrowid
+        for assignment in librarians[initials]["assignment"]:
+            cursor.execute(
+                "INSERT INTO librarian_assignments(cn_section, librarian_id) VALUES (?,?);",
+                (assignment, librarians[initials]["id"])
+            )
     conn.commit()
     return librarians
 
 
-def loadCallnumbers(librarians, subjects) -> None:
-    global SECTIONS
-
+def load_callnumbers(librarians, subjects) -> None:
     print("\nCreate callnumbers...")
     callnumber_counts = {}
     # Collection counts
@@ -53,13 +56,14 @@ def loadCallnumbers(librarians, subjects) -> None:
     index = 0
     bar = progressbar.ProgressBar(max_value=len(all_callnumbers))
     for cn in all_callnumbers:
-        for sec in SECTIONS:
-            if cn.startswith(sec):
-                if sec in callnumber_counts:
-                    callnumber_counts[sec]["collection"] += 1
-                else:
-                    callnumber_counts[sec] = {"collection": 1, "recommended": 0}
-                break
+        for sec in posted_files.SECTIONS:
+            if not cn.startswith(sec):
+                continue
+            if sec in callnumber_counts:
+                callnumber_counts[sec]["collection"] += 1
+            else:
+                callnumber_counts[sec] = {"collection": 1, "recommended": 0}
+            break
         bar.update(index)
         index += 1
     del all_callnumbers
@@ -70,7 +74,7 @@ def loadCallnumbers(librarians, subjects) -> None:
     index = 0
     bar = progressbar.ProgressBar(max_value=len(gg_callnumbers))
     for cn in gg_callnumbers:
-        for sec in SECTIONS:
+        for sec in posted_files.SECTIONS:
             if cn.startswith(sec):
                 callnumber_counts[sec]["recommended"] += 1
                 break
@@ -84,7 +88,7 @@ def loadCallnumbers(librarians, subjects) -> None:
     bar.finish()
 
     for cn_section in callnumber_counts:
-        print (cn_section, callnumber_counts[cn_section])
+        print(cn_section, callnumber_counts[cn_section])
         subject_id = -1
         assigned_to = -1
         for initials in librarians:
@@ -95,9 +99,11 @@ def loadCallnumbers(librarians, subjects) -> None:
         if subject_id == -1:
             print("missing", cn_section)
             break
+        section = callnumber_counts[cn_section]
         cursor.execute(
-            "INSERT INTO callnumber_sections(cn_section, collection_count, gg_recommended, librarian_id) VALUES (?,?,?,?);",
-            (cn_section, callnumber_counts[cn_section]["collection"], callnumber_counts[cn_section]["recommended"], assigned_to)
+            "INSERT INTO callnumber_sections"
+            "(cn_section, collection_count, gg_recommended, reviewed_count, librarian_id) VALUES (?,?,?,?,?);",
+            (cn_section, section["collection"], section["recommended"], 0, assigned_to)
         )
         cursor.execute(
             "INSERT INTO sections_subjects(cn_section, subject_id) VALUES (?,?);",
@@ -106,7 +112,7 @@ def loadCallnumbers(librarians, subjects) -> None:
     conn.commit()
 
 
-def loadExcludedSets() -> None:
+def load_excluded_sets() -> None:
     print("\nLoading excluded barcodes...")
     excluded_path = "db_data/excluded"
     excluded_files = os.listdir(excluded_path)
@@ -125,10 +131,10 @@ def loadExcludedSets() -> None:
 
 
 # Static data
-subjects = loadSubjects()
-librarians = loadLibrarians()
-loadExcludedSets()
-loadCallnumbers(librarians, subjects)
+SUBJECTS = load_subjects()
+LIBRARIANS = load_librarians()
+load_excluded_sets()
+load_callnumbers(LIBRARIANS, SUBJECTS)
 
 # Dynamic data
 addNewPostedFiles(conn)

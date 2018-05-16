@@ -154,6 +154,6 @@ def updateReviewedCounts(conn: Connection) -> object:
     for section in section_review_sums:
         cursor.execute(
             "UPDATE callnumber_sections SET reviewed_count=? WHERE cn_section=?",
-            (section_review_sums[section], section)
+            (section_review_sums[section] if section in section_review_sums else 0, section)
         )
     conn.commit()

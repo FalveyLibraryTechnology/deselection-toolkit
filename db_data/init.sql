@@ -48,6 +48,15 @@ CREATE TABLE librarians
     initials     VARCHAR(3)
 );
 
+CREATE TABLE librarian_assignments
+(
+    cn_section   VARCHAR PRIMARY KEY,
+    librarian_id INTEGER,
+
+    FOREIGN KEY(cn_section) REFERENCES callnumber_sections(cn_section),
+    FOREIGN KEY(librarian_id) REFERENCES librarians(librarian_id)
+);
+
 CREATE TABLE posted_books
 (
     barcode         INTEGER PRIMARY KEY,
@@ -80,7 +89,10 @@ CREATE TABLE sections_subjects
     subject_id INTEGER,
     cn_section VARCHAR(3),
 
-    PRIMARY KEY(subject_id, cn_section)
+    PRIMARY KEY(subject_id, cn_section),
+
+    FOREIGN KEY(subject_id) REFERENCES subjects(subject_id),
+    FOREIGN KEY(cn_section) REFERENCES callnumber_sections(cn_section)
 );
 
 CREATE TABLE subjects

@@ -1,22 +1,33 @@
-import os
-import re
-
 from xlrd import open_workbook  # Excel files
-from typing import Dict
+from typing import Dict, Optional
 
 from .utils import normalize_callnumber
 
-SECTIONS = ["DAW", "DJK", "QA", "QB", "QC", "QD", "QE", "SB", "SD", "SF", "SH", "SK", "TA", "TC", "TD", "TE", "TF", "TG", "TH", "TJ", "TK", "TL", "TN", "TP", "TS", "TT", "TX", "BL", "BM", "BP", "BQ", "BR", "BS", "BT", "BV", "BX", "PA", "ZA", "JA", "JC", "JF", "JJ", "JK", "JL", "JN", "JQ", "JS", "JV", "JX", "JZ", "CB", "CC", "CD", "CE", "CJ", "CN", "CR", "CS", "CT", "DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DJ", "DK", "DP", "DQ", "DR", "DS", "DT", "DU", "DX", "GN", "GR", "GT", "GV", "HM", "HN", "HQ", "HS", "HT", "HV", "HX", "NA", "NB", "NC", "ND", "NE", "NK", "NX", "TR", "HA", "HB", "HC", "HD", "HE", "HF", "HG", "BF", "GA", "GB", "GC", "GE", "GF", "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LJ", "LT", "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "VA", "VB", "VC", "VD", "VE", "VF", "VG", "VK", "VM", "BC", "BD", "BH", "QH", "QK", "QL", "QM", "QP", "QR", "RA", "RB", "RC", "RD", "RE", "RF", "RG", "RJ", "RK", "RL", "RM", "RS", "RT", "RV", "RX", "RZ", "BJ", "PE", "PB", "PC", "PD", "PF", "PG", "PH", "PJ", "PK", "PL", "PM", "PQ", "PN", "PR", "PS", "PT", "A", "Q", "S", "T", "J", "C", "D", "E", "F", "N", "Z", "H", "K", "G", "L", "U", "V", "B", "R", "M", "P"]
+SECTIONS = ["DAW", "DJK", "QA", "QB", "QC", "QD", "QE", "QH", "QK", "QL", "QM", "QP", "QR",
+            "BC", "BD", "BH", "BL", "BF", "BJ", "BM", "BP", "BQ", "BR", "BS", "BT", "BV", "BX",
+            "CB", "CC", "CD", "CE", "CJ", "CN", "CR", "CS", "CT",
+            "DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DJ", "DK", "DP", "DQ", "DR", "DS", "DT", "DU", "DX",
+            "GA", "GB", "GC", "GE", "GF", "GN", "GR", "GT", "GV",
+            "HA", "HB", "HC", "HD", "HE", "HF", "HG", "HM", "HN", "HQ", "HS", "HT", "HV", "HX",
+            "JA", "JC", "JF", "JJ", "JK", "JL", "JN", "JQ", "JS", "JV", "JX", "JZ",
+            "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LJ", "LT",
+            "NA", "NB", "NC", "ND", "NE", "NK", "NX", "TR",
+            "PA", "PE", "PB", "PC", "PD", "PF", "PG", "PH", "PJ", "PK", "PL", "PM", "PQ", "PN", "PR", "PS", "PT",
+            "RA", "RB", "RC", "RD", "RE", "RF", "RG", "RJ", "RK", "RL", "RM", "RS", "RT", "RV", "RX", "RZ",
+            "SB", "SD", "SF", "SH", "SK",
+            "TA", "TC", "TD", "TE", "TF", "TG", "TH", "TJ", "TK", "TL", "TN", "TP", "TS", "TT", "TX",
+            "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "VA", "VB", "VC", "VD", "VE", "VF", "VG", "VK", "VM", "ZA",
+            "A", "Q", "S", "T", "J", "C", "D", "E", "F", "N", "Z", "H", "K", "G", "L", "U", "V", "B", "R", "M", "P"]
 
-# TODO: Reviewed count
-def parse_source_file(filepath) -> Dict:
+
+def parse_source_file(filepath) -> Optional[Dict]:
     global SECTIONS
 
     # Get callnumber section
     path = filepath.split("\\")
     filename = path[len(path) - 1]
     if filename[0] == "~":
-        print ("Make sure %s isn't open in Excel (Skipping)" % path[len(path) - 1])
+        print("Make sure %s isn't open in Excel (Skipping)" % path[len(path) - 1])
         return None
     cn_section = None
     for sec in SECTIONS:
@@ -44,8 +55,8 @@ def parse_source_file(filepath) -> Dict:
                 books_columns[column_names[name]] = rvalues.index(name)
             else:
                 for i in range(len(rvalues)):
-                    print ("x\t%s" % filename)
-                    print ("x\t%s" % rvalues[i])
+                    print("x\t%s" % filename)
+                    print("x\t%s" % rvalues[i])
                     raise ValueError("Invalid columns")
         books = []
         for row in range(1, sheet.nrows):
