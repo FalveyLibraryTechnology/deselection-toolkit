@@ -167,6 +167,36 @@ def get_cumulative_personal_bysection() -> Dict[str, int]:
     return counts
 
 
+def generate_reports_for_period(folder: str, query_date: datetime) -> None:
+    if not os.path.exists("db_reports/%s/" % folder):
+        os.mkdir("db_reports/%s/" % folder)
+    # Faculty All Requests
+    write_csv_file(
+        "faculty-all-requests.csv", folder,
+        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal", "Request Date"],
+        query_all_faculty_requests(query_date)
+    )
+    # Faculty Effective
+    write_csv_file(
+        "faculty-effective-requests.csv", folder,
+        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal"],
+        query_faculty_effective(query_date)
+    )
+    # Personal Retention Effective
+    write_csv_file(
+        "faculty-requests-for-personal-collections.csv", folder,
+        ["Callnumber", "Faculty Name", "Faculty Address", "Title", "Author", "Publish Year", "Barcode"],
+        query_for_personal_effective(query_date)
+    )
+    if query_date is not None:
+        # Master Pull List
+        write_csv_file(
+            "master-pull-list.csv", folder,
+            ["Callnumber", "Title", "Author", "Publish Year", "Barcode"],
+            query_master_list(query_date)
+        )
+
+
 def create_collection_review() -> None:
     print("Create Collection Review (MG Format)...")
     subject_counts = query_subject_counts()
@@ -283,54 +313,9 @@ months = [dir_.path.split("/")[1] for dir_ in os.scandir("sources/") if dir_.is_
 for month in months:
     print("\t%s" % month)
     month_date = datetime.datetime.strptime(month, "%B %Y")
-    if not os.path.exists("db_reports/%s/" % month):
-        os.mkdir("db_reports/%s/" % month)
-    # Faculty All Requests
-    write_csv_file(
-        "faculty-all-requests.csv", month,
-        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal", "Request Date"],
-        query_all_faculty_requests(month_date)
-    )
-    # Faculty Effective
-    write_csv_file(
-        "faculty-effective-requests.csv", month,
-        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal"],
-        query_faculty_effective(month_date)
-    )
-    # Personal Retention Effective
-    write_csv_file(
-        "faculty-requests-for-personal-collections.csv", month,
-        ["Callnumber", "Faculty Name", "Faculty Address", "Title", "Author", "Publish Year", "Barcode"],
-        query_for_personal_effective(month_date)
-    )
-    # Master Pull List
-    write_csv_file(
-        "master-pull-list.csv", month,
-        ["Callnumber", "Title", "Author", "Publish Year", "Barcode"],
-        query_master_list(month_date)
-    )
+    generate_reports_for_period(month, month_date)
 
 print("Create Cumulative Reports...")
-if not os.path.exists("db_reports/Cumulative/"):
-    os.mkdir("db_reports/Cumulative/")
-# Faculty All Requests
-write_csv_file(
-    "faculty-all-requests.csv", "Cumulative",
-    ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal", "Request Date"],
-    query_all_faculty_requests(None)
-)
-# Faculty Effective
-write_csv_file(
-    "faculty-effective-requests.csv", "Cumulative",
-    ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal"],
-    query_faculty_effective(None)
-)
-# Personal Retention Effective
-write_csv_file(
-    "faculty-requests-for-personal-collections.csv", "Cumulative",
-    ["Callnumber", "Faculty Name", "Faculty Address", "Title", "Author", "Publish Year", "Barcode"],
-    query_for_personal_effective(None)
-)
-
+generate_reports_for_period("Cumulative", None)
 create_collection_review()
 progress_by_callnumber_section()
