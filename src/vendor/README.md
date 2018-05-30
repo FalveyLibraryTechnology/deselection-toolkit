@@ -1,0 +1,1 @@
+Code sourced from [https://github.com/libraryhackers/library-callnumber-lc](https://raw.githubusercontent.com/libraryhackers/library-callnumber-lc/master/python/callnumber/__init__.py).

@@ -1,7 +1,5 @@
 # Output folders
-checked_out/out/
-checked_out/*.txt
-checked_out/*.xlsx
+db_reports/
 hashes/
 reports/
 split_logs/out/
@@ -12,13 +10,20 @@ sources/
 Archive/
 *.csv
 *.json
+db_data/**/*.log
+db_data/**/*.txt
+remove_excluded/*.log
+remove_excluded/*.txt
+remove_excluded/**/*.xlsx
 
 # Villanova Content
 adjustments/
 split_logs/input.csv
 split_logs/raw-log
+villanova/
 
 # Python
+.idea/
 __pycache__/
 *.py[cod]
 *$py.class
