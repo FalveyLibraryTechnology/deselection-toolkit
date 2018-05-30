@@ -62,13 +62,15 @@ CREATE TABLE posted_books
     barcode         INTEGER PRIMARY KEY,
     callnumber      VARCHAR,
     callnumber_sort VARCHAR,
+    cn_section      VARCHAR(3),
     title           VARCHAR,
     author          VARCHAR,
     pub_year        TINYINT,
     -- CONNECTIONS
     file_id         INTEGER,
 
-    FOREIGN KEY(file_id) REFERENCES posted_files(file_id)
+    FOREIGN KEY(file_id) REFERENCES posted_files(file_id),
+    FOREIGN KEY(cn_section) REFERENCES callnumber_sections(cn_section)
 );
 
 CREATE TABLE posted_files
@@ -78,10 +80,8 @@ CREATE TABLE posted_files
     month   DATE,
     -- CONNECTIONS
     librarian_id INTEGER,
-    cn_section   VARCHAR(3),
 
-    FOREIGN KEY(librarian_id) REFERENCES librarians(librarian_id),
-    FOREIGN KEY(cn_section) REFERENCES callnumber_sections(cn_section)
+    FOREIGN KEY(librarian_id) REFERENCES librarians(librarian_id)
 );
 
 CREATE TABLE sections_subjects

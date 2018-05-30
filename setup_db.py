@@ -1,11 +1,11 @@
 import json
 import progressbar
 import sqlite3
-import src.posted_files as posted_files
 
 from typing import Dict
 
 from src.database_defs import *
+from src.posted_files import get_callnumber_section
 from src.utils import make_unique, normalize_callnumber
 
 # Check if exists
@@ -56,14 +56,14 @@ def load_callnumbers(librarians, subjects) -> None:
     index = 0
     bar = progressbar.ProgressBar(max_value=len(all_callnumbers))
     for cn in all_callnumbers:
-        for sec in posted_files.SECTIONS:
-            if not cn.startswith(sec):
-                continue
+        try:
+            sec = get_callnumber_section(cn)
             if sec in callnumber_counts:
                 callnumber_counts[sec]["collection"] += 1
             else:
                 callnumber_counts[sec] = {"collection": 1, "recommended": 0}
-            break
+        except ValueError:
+            pass
         bar.update(index)
         index += 1
     del all_callnumbers
@@ -74,11 +74,16 @@ def load_callnumbers(librarians, subjects) -> None:
     index = 0
     bar = progressbar.ProgressBar(max_value=len(gg_callnumbers))
     for cn in gg_callnumbers:
-        for sec in posted_files.SECTIONS:
-            if cn.startswith(sec):
-                callnumber_counts[sec]["recommended"] += 1
-                break
-        gg_callnumbers[index] = normalize_callnumber(cn)
+        try:
+            sec = get_callnumber_section(cn)
+            callnumber_counts[sec]["recommended"] += 1
+        except ValueError:
+            continue
+        try:
+            gg_callnumbers[index] = normalize_callnumber(cn)
+        except ValueError:
+            # print ("odd gg callnumber: %s" % cn)
+            pass
         bar.update(index)
         index += 1
     gg_callnumbers = make_unique(gg_callnumbers)
@@ -88,7 +93,7 @@ def load_callnumbers(librarians, subjects) -> None:
     bar.finish()
 
     for cn_section in callnumber_counts:
-        print(cn_section, callnumber_counts[cn_section])
+        # print(cn_section, callnumber_counts[cn_section])
         subject_id = -1
         assigned_to = -1
         for initials in librarians:
@@ -100,6 +105,8 @@ def load_callnumbers(librarians, subjects) -> None:
             print("missing", cn_section)
             break
         section = callnumber_counts[cn_section]
+        if section["collection"] < section["recommended"]: # GG counts may be higher due to collection changes
+            section["collection"] = section["recommended"]
         cursor.execute(
             "INSERT INTO callnumber_sections"
             "(cn_section, collection_count, gg_recommended, reviewed_count, librarian_id) VALUES (?,?,?,?,?);",

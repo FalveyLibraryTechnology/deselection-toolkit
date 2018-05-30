@@ -15,11 +15,9 @@ csv.field_size_limit(sys.maxsize)
 
 def queryFileCallnumberTopBottom(conn: Connection) -> Iterable[Tuple[str, str, str]]:
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT posted_files.cn_section, MIN(posted_books.callnumber_sort), MAX(posted_books.callnumber_sort)
-            FROM posted_books
-            INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
-            GROUP BY posted_files.file_id""")
+    cursor.execute("SELECT cn_section, MIN(callnumber_sort), MAX(callnumber_sort)"
+                   " FROM posted_books"
+                   " GROUP BY cn_section")
     return cursor.fetchall()
 
 
@@ -46,15 +44,18 @@ def addNewPostedFiles(conn: Connection) -> None:
                     if ("_%s_" % lib["initials"]) in file["name"]:
                         month_date = datetime.datetime.strptime(month, "%B %Y")
                         cursor.execute(
-                            "INSERT INTO posted_files (name, cn_section, librarian_id, month) VALUES (?,?,?,?)",
-                            (file["name"], file["cn_section"], lib["id"], month_date)
+                            "INSERT INTO posted_files (name, librarian_id, month) VALUES (?,?,?)",
+                            (file["name"], lib["id"], month_date)
                         )
                         file_id = cursor.lastrowid
                         break
                 for book in file["books"]:
                     cursor.execute(
-                        "INSERT INTO posted_books (barcode, callnumber, callnumber_sort, title, author, pub_year, file_id) VALUES (?,?,?,?,?,?,?)",
-                        (int(book["barcode"]), book["callnumber"], book["callnumber_sort"], book["title"], book["author"], book["year"], file_id)
+                        "INSERT INTO posted_books"
+                        " (barcode, callnumber, callnumber_sort, cn_section, title, author, pub_year, file_id)"
+                        " VALUES (?,?,?,?,?,?,?,?)",
+                        (int(book["barcode"]), book["callnumber"], book["callnumber_sort"], book["cn_section"],
+                         book["title"], book["author"], book["year"], file_id)
                     )
     conn.commit()
 
@@ -103,10 +104,9 @@ def addNewRequests(conn: Connection) -> None:
         for book in request["books"]:
             # Duplicate barcode in same request
             if book["barcode"] in included_barcodes:
-                cursor.execute("""
-                    SELECT posted_files.name FROM posted_files
-                        INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id
-                        WHERE posted_books.barcode=?""", (book["barcode"],))
+                cursor.execute("SELECT posted_files.name FROM posted_files"
+                               " INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id"
+                               " WHERE posted_books.barcode=?", (book["barcode"],))
                 file_obj = cursor.fetchone()
                 print("\tduplicate in this request: %s (%s)" % (book["barcode"], file_obj[0]))
                 continue
