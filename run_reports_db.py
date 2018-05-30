@@ -96,8 +96,7 @@ def query_subject_book_counts() -> List[Tuple]:
         SELECT subjects.label, COUNT(posted_books.barcode), COUNT(faculty_books.barcode)
             FROM subjects
             INNER JOIN sections_subjects ON sections_subjects.subject_id = subjects.subject_id
-            INNER JOIN posted_files ON posted_files.cn_section = sections_subjects.cn_section
-            INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id
+            INNER JOIN posted_books ON posted_books.cn_section = sections_subjects.cn_section
             LEFT JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
             GROUP BY subjects.subject_id
             ORDER BY subjects.subject_id ASC""")
@@ -117,8 +116,7 @@ def query_section_book_counts() -> List[Tuple]:
     cursor.execute("""
         SELECT callnumber_sections.cn_section, COUNT(posted_books.barcode)
             FROM callnumber_sections
-            INNER JOIN posted_files ON posted_files.cn_section = callnumber_sections.cn_section
-            INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id
+            INNER JOIN posted_books ON posted_books.cn_section = callnumber_sections.cn_section
             GROUP BY callnumber_sections.cn_section
             ORDER BY callnumber_sections.cn_section ASC""")
     return cursor.fetchall()
@@ -128,8 +126,7 @@ def get_cumulative_effective_bysection() -> Dict:
     cursor.execute("""
         SELECT callnumber_sections.cn_section
             FROM callnumber_sections
-            INNER JOIN posted_files ON posted_files.cn_section = callnumber_sections.cn_section
-            INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id
+            INNER JOIN posted_books ON posted_books.cn_section = callnumber_sections.cn_section
             INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
             INNER JOIN faculty_requests ON faculty_requests.request_id = faculty_books.request_id
             INNER JOIN faculty ON faculty.faculty_id = faculty_requests.faculty_id
@@ -149,8 +146,7 @@ def get_cumulative_personal_bysection() -> Dict[str, int]:
     cursor.execute("""
         SELECT callnumber_sections.cn_section
             FROM callnumber_sections
-            INNER JOIN posted_files ON posted_files.cn_section = callnumber_sections.cn_section
-            INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id
+            INNER JOIN posted_books ON posted_books.cn_section = callnumber_sections.cn_section
             INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
             INNER JOIN faculty_requests ON faculty_requests.request_id = faculty_books.request_id
             INNER JOIN faculty ON faculty.faculty_id = faculty_requests.faculty_id
@@ -236,7 +232,7 @@ def create_collection_review() -> None:
                       "% of Total Collection,"
                       "% of Total Monograph Collection (print & electonic),,"
                       "# of Items in Subject Area to be Retained (as of %s),"
-                      "# of Items in Subject Area Remaining to be Reviewed (as of %s),,"               
+                      "# of Items in Subject Area Remaining to be Reviewed (as of %s),,"
                       "%% of Items in Subject Area to be Retained (as of %s)\n".format(as_of, as_of, as_of))
 
     index = 0
@@ -280,20 +276,20 @@ def progress_by_callnumber_section() -> None:
         faculty_count = faculty_counts[label] if label in faculty_counts else 0
         personal_count = personal_counts[label] if label in personal_counts else 0
         cn_section_rows.append((
-            label,
-            collection_count,
-            collection_count / collection_total,
-            gg_recommended,
-            gg_recommended / collection_count,
-            reviewed_count,
-            reviewed_count / collection_count,
-            reviewed_count - posted_counts,
-            ((reviewed_count - posted_counts) / gg_recommended) if posted_counts > 0 else 0,
-            posted_counts,
-            faculty_count,
-            personal_count,
-            (faculty_count / posted_counts) if posted_counts > 0 else "",
-            (faculty_count / gg_recommended) if posted_counts > 0 else 0
+            label,  # section
+            collection_count,  # items in collection
+            collection_count / collection_total,  # percentage of collection
+            gg_recommended,  # items recommended
+            gg_recommended / collection_count,  # percentage of collection recommended
+            reviewed_count,  # items reviews by librarians
+            reviewed_count / gg_recommended if gg_recommended > 0 else 0,  # percentage of gg librarian reviewed
+            reviewed_count - posted_counts,  # items retained by staff
+            ((reviewed_count - posted_counts) / gg_recommended) if gg_recommended > 0 else 0,  # % librarian retained
+            posted_counts,  # items posted to faculty
+            faculty_count,  # items retained in collection by faculty
+            personal_count,  # faculty personal collections
+            (faculty_count / posted_counts) if posted_counts > 0 else "",  # percentage of posted retained by faculty
+            (faculty_count / gg_recommended) if posted_counts > 0 else 0  # percentage of recommended faculty retained
         ))
     write_csv_file(
         "callnumber_section_stats.csv", ".",
@@ -301,7 +297,7 @@ def progress_by_callnumber_section() -> None:
          "# of Items Recommended for Removal by Greenglass", "% of Collection Quantitatively Recommended For Removal",
          "# of Items Reviewed By Library Staff", "% of Recommendations Reviewed To Date (Progress)",
          "# of Items Retained by Library Staff", "% of Recommendations Retained By Library Staff",
-         "# of Items Posted to Faculty", "# of Items Retained By Faculty",
+         "# of Items Posted to Faculty", "# of Items Retained In Collection By Faculty",
          "# of Items Requested For Personal Collections By Faculty", "% of Posted Items Retained By Faculty",
          "% of Recommendations Retained by Faculty"],
         cn_section_rows
