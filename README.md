@@ -13,7 +13,7 @@ The contents of this repository represent the tools developed for Falvey Memoria
 ### Internal factors
  - Absence of a library-wide systematic collection review
  - Changing need for study/research space
- - The University’s status change to a doctoral university in Carnegie Classification
+ - The University's status change to a doctoral university in Carnegie Classification
 
 ## Our Process
 
@@ -30,77 +30,152 @@ We started in April 2017 by purchasing a GreenGlass report and designing a feedb
 The faculty feedback process at Villanova relies on a multi-step, monthly process.
 
 *At the end of each month*
-1. Circulation data is gathered and books that have been checked out since the GreenGlass report are removed from the sheets about to be presented to the faculty. One of our criteria is books must have not circulated in the past 10 years, so we need to disqualify books that have been checked out since April. The script `remove_checked_out.py` assists with this.
+1. Circulation data is gathered and books that have been checked out since the GreenGlass report are removed from the sheets about to be presented to the faculty. One of our criteria is books must have not circulated in the past 10 years, so we need to disqualify books that have been checked out since April.
 1. The website we use to present the data is set up and queued to update in the morning.
 
 *At the start of each month*
-1. Capture all of the data from our faculty feedback form, cutting it off at midnight and loading it into a large input file.
-1. Run this file through `split_logs.py`, this splits logs into appropriate months for us which takes care of extensions and delays for us.
+1. Capture all of the data from our faculty feedback form, cutting it off at midnight.
+1. Update the datbase via Python scripts.
 1. Archive the previous months reviewed sheets.
-1. Use `cumulative_reports.py` to generate final reports for the month.
+1. Generate final reports for the month and update cumulative reports.
+1. Post reports in a location all leadership and staff can access for accessment and book removal.
 
 Faculty feedback is channeled into two categories. The first is books that the faculty member would like to remain in the library's collection. The second are books that faculty members would like to keep for their own personal collections. It's important to note that, in our process, **all faculty feedback is respected**. There are a few rules to make the order of requests fair, but no faculty requests are discarded.
 
+1. We keep any book that a faculty member has submitted for retention, even if it was requested for a personal collection.
+1. Books only requested for personal collections are distributed to the faculty member who requested it earliest.
+
+### Lessons Learned
+
+1. To reduce the load on your librarians and your faculty, it is recommended that you identify collections and media types that are exempt from deselection. Remove these items from the Greenglass Reports before your librarians begin their manual review.
+1. We have seen that monthly extensions do not cause a significant increase in reserved items but go a long way in soothing faculty anxiety.
+1. Most faculty who are upset about the process are best handled by explaining the process in full. At Falvey, faculty reach out to their subject librarians, with whom they already have some rapport, when they have concerns or questions.
+
+## The Reports
+
+These are the reports that we are generating that we find most useful. These files are almost entirely Excel or Excel-compatible files, such as CSVs.
+
+### Each Month
+
+1. All faculty requests, sorted by barcode, including call number, book metadata, faculty name, and whether or not it is a personal request or a retention request.
+1. All *effective* faculty requests, grouped by faculty. In this file, books that are requested by multiple parties are resolved following the rules above and are displayed once each.
+1. All books requested for personal collections, by call number, with faculty delivery information, for easiest extraction and delivery.
+1. A master pull list of all books submitted to faculty that month, minus the ones retained in the collection or in personal collections. All books on this list have been finalized for removal from the collection.
+1. Automated email forms. We send each faculty an email containing a list of the books they will be receiving for their personal collection. This form cuts back on manual work significantly for the staff member that coordinates that. This report isn't included in the scripts of this repository, because it is highly customized.
+
+### Cumulative
+
+1. Progress by subject area. Includes numbers and percentages of each collection reviewed and retained by library staff and faculty.
+1. Progress broken down by callnumber section.
+1. A report of files that were extended beyond their initial month of faculty review with number of items added in those additional months.
+1. All faculty requests, as above.
+1. All effective faculty requests, as above.
+1. All books requested for personal collections, as above.
+
 ## The Scripts
 
-These scripts work around barcode organizing and matching, which we found to be a reliable data point. So if your input contains anything, make it a barcode. We can get the rest of the data from WorldCat or another source. We have also used ISBN matching for other projects, with good success.
+Included in this project are the Python scripts developed at Falvey Library to assist in the deselection process. These scripts work around barcode organizing and matching, which we found to be the most reliable data point for uniquely identifying items. So if your input contains anything, make it a barcode. We can get the rest of the data from WorldCat or another source. We have also used ISBN matching for other projects, with good success.
 
-### remove_checked_out.py
+The latest version of the program loads all of the information into an SQLite database which is then queried to generate the reports. This database is described in `db_data/init.sql` and can be setup in any way, although modifying `setup_db.py` may be the easiest.
 
-> Step 1 in our monthly process
+### `setup_db.py`
 
-This script checks every row for barcodes that are in an up-to-date list of recently checked out barcodes and removes rows that match. The resulting sheets are uploaded for faculty, review.
+Populates all of the data in the database, static and dynamic. Inputs are described below.
 
-| Input | Description |
-|-------|-------------|
-| checkedout_since_greenglass.txt | All of the barcodes that are in the GreenGlass report that have been checked out since the report was generated. |
-| Deselection Sheets | Any Excel spreadsheets in the `checked_out/` folder are processed, with disqualified rows removed. |
+### `update_db.py`
 
-### split_logs.py
+Updates the most commonly changed parts of the database:
++ Files posted to faculty (posted_files)
++ Faculty retention requests (faculty_requests)
++ Counts of how many items in the project have been reviewed
 
-> Step 2 in our monthly process
+### `run_reports_db.py`
 
-Our faculty feedback and final reports are very regimented by month. This script takes all of our faculty submissions and splits them by month to match their sources. The following logs are added to the `sources/` folder for the grand finale.
+Generates all of the above reports. Creates a folder for each month and a Cumulative folder.
 
-| Input | Description |
-|-------|-------------|
-| input.csv | Our input at Villanova is one long file that contains the raw form data. There are many ways to go about this, but this was the simplest way for us. |
-| Deselection Sheets | Pulled from `sources/` and used to index all of the faculty requests. |
-| checkedout_since_greenglass.txt | Used to make sure disqualified barcodes aren't marked as missing. |
+## Inputs
 
-Missing or incorrect barcodes are highlighted in the log and incorrect data is checked and repaired by hand. For example, we often get callnumbers instead of barcodes in our form.
+For the setup and update scripts, these are the inputs used out of the box. The code to digest these can and should be modified to support your library's needs. All of these files live in the `db_data` folder.
 
-This step may be integrated into `cumulative_reports.py` at a future date.
+### active_callnumbers.txt
 
-### cumulative_reports.py
+All callnumbers actively in the collection. Saved for progress reports. Only needed in `setup_db.py`.
 
-> The report generator
+### gg_callnumbers.txt
 
-This final script is fed by the outputs of the other scripts. There are a few rules to make the faculty requests fair:
-1. Requesting books for a personal collection are on a first-come, first-serve basis. Earlier requests override later requests.
-1. Requests to keep a book in the collection override requests for personal collections.
+All callnumbers recommended by GG for removal, based on our criteria. These will be normalized and saved to `gg_callnumbers_norm.txt` for future database updates, including review counts.
 
-| Input | Description |
-|-------|-------------|
-| Deselection Sheets | These are the Excel sheets presented to the faculty. They contain one book per line with some of the quantitative analysis data. They are all kept in the `sources/` directory. |
-| Feedback Logs | The logs are named `{month}-{year}-log.csv` and contain the raw form data form faculty submission, having been cleaned and organized by `split_logs.py`. |
+### librarians.json
 
-We generate a few reports we find very useful:
+A JSON file of all of the library staff with the information below. The initials are important in our case because each file posted to faculty has the librarian who generated it in the name.
 
-| Report | Description |
-|--------|-------------|
-| master-pull-list.csv | The complete list of books to be removed from the shelves (and donated in our case). It contains all of the individual lists with all of the retention requests (collection and personal) removed. |
-| all-retention-by-faculty.csv | A sheet detailing what effect each faculty member had on the deselection in tabbed sections. |
-| all-retention-by-callnumber.csv | The same information as the sheet above, but de-sectioned sorted by callnumber for analysis. |
-| for-personal-collection-by-faculty.csv | A sheet detailing what books each faculty member will be receiving for their personal collections. |
-| for-personal-collection-by-callnumber.csv | The same as above, but de-sectioned and sorted by callnumber, for easier location and processing. |
-| personal-retention-emails.csv | A templated email that is generated containing a list of all the books they will be receiving for their collections and a summary of the request override rules. |
+```js
+"FL": {
+    "name": "First Last",
+    "subject": "Humanities",
+    "assignment": ["BX", "PA", "ZA"] // in charge of these call numbers
+},
+```
 
-| Graph | Description |
-|--------|-------------|
-| callnumber_areas_by_callnumber.png | A bar for each call number section, showing approximate action by subject. Each bar represents the total number of marked book for that section with sub bars for number of retention requests by faculty and number of personal collection requests. |
-| callnumber_areas_by_retention.png | The same as above, but sorted by number retained. |
-| callnumber_areas_by_size.png | The same as above, but sorted by number of marked files. |
-| faculty.png | Shows a bar for each faculty member showing the number of requested items with a sub bar of how many of those requests are for their personal collection. |
+### faculty_requests.csv
 
-These are generated for each month with an additional cumulative report.
+This is the most important file. It's converted into data in `src/database_defs.py` > `addNewRequests`. Our file is a CSV of form data, with the datetime and raw request body included for parsing. Ours looks like this (simplified):
+
+```txt
+Date,Level,Channel,User,Message
+"Apr 9, 2018, 10:02:16 AM",INFO,"Sent Emails",Guest,"
+There has been a submission of the Collection Directorate Weeding Form.
+
+Faculty First Name:
+First
+
+Faculty Last Name:
+Last
+
+Faculty Department:
+Computer Science
+
+Campus Address:
+CSC 555
+
+Barcode:
+39346001061763
+
+Title:
+A Made-Up CS Book
+
+Destination:
+Patron (personal collection)
+
+Comment:
+My favorite book - F. Last
+
+Barcode:
+39346003186139
+
+Title:
+A Made-Up Sequel
+...
+```
+
+### subject_list.txt
+
+A list of subjects for the program to track, one per line. Books are matched to a subject by which librarian created the faculty report they would be found in.
+
+```txt
+Social Sciences
+Humanities
+STEM
+```
+
+### Excluded Files
+
+There is a folder called `excluded` in `db_data` that contains one text file for each collection or list of items automatically excluded from deselection. One of these is the list of books that have been checked out since our GreenGlass report was generated. The first line is the reason for exlusion, the rest of the lines are barcodes, one per line.:
+
+```txt
+Checked out since April 1, 2017
+39346009142367
+39346009142128
+39346009140809
+...
+```
