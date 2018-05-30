@@ -1,4 +1,5 @@
 # Output folders
+db_reports/
 hashes/
 reports/
 split_logs/out/
@@ -9,6 +10,7 @@ sources/
 Archive/
 *.csv
 *.json
+db_data/**/*.log
 db_data/**/*.txt
 remove_excluded/*.log
 remove_excluded/*.txt
