@@ -24,7 +24,7 @@ lccn_re = re.compile(r'''^
         \s*
         (?:               # optional cutter
           \.? \s*
-          ([A-Z])      # cutter letter
+          ([A-Z]{1,3})      # cutter letter # Falvey customization to up to 3 letters (DA3.AIM34 1970B)
           \s*
           (\d+ | \Z)        # cutter numbers
         )?
@@ -52,21 +52,27 @@ def normalize(lc, bottom=False):
     bottomout = bottom
 
     if re.match(weird_re, lc):
+        # print("normalize: weird_re")
         return None
 
     m = re.match(lccn_re, lc)
     if not m:
+        # print("normalize: not lccn_re")
         return None
 
     origs = m.groups('')
     (alpha, num, dec, c1alpha, c1num,
      c2alpha, c2num, c3alpha, c3num, extra) = origs
 
-    if (len(dec) > 2) or num == '':
-        return None
+    # Falvey customization for longer decimals
+    if (len(dec) > 4) or num == '':
+        # print("normalize: %s (dec > 4 or not num)" % lc)
+        # print(origs)
+        # return None
+        pass
 
     if alpha and not (num or dec or c1alpha or c1num or c2alpha \
-                          or c2num or c3alpha or c3num):
+                      or c2num or c3alpha or c3num):
         if extra:
             return None
         if bottomout:
@@ -79,7 +85,7 @@ def normalize(lc, bottom=False):
     topnorm = [
         alpha + topspace * (3 - len(alpha)),
         num + topdigit * (4 - len(num)),
-        dec + topdigit * (2 - len(dec)),
+        dec + topdigit * (4 - len(dec)),  # Falvey customization for longer decimals
         c1alpha if c1alpha else topspace,
         c1num + topdigit * (3 - len(c1num)),
         c2alpha if c2alpha else topspace,
@@ -92,7 +98,7 @@ def normalize(lc, bottom=False):
     bottomnorm = [
         alpha + bottomspace * (3 - len(alpha)),
         num + bottomdigit * (4 - len(num)),
-        dec + bottomdigit * (2 - len(dec)),
+        dec + bottomdigit * (4 - len(dec)),  # Falvey customization for longer decimals
         c1alpha if c1alpha else bottomspace,
         c1num + bottomdigit * (3 - len(c1num)),
         c2alpha if c2alpha else bottomspace,
@@ -124,7 +130,7 @@ class LC(object):
         try:
             self.denormalized = callno.upper()
         except AttributeError:
-            print ("*** ERROR: '%s' not a string?" % (callno))
+            print("*** ERROR: '%s' not a string?" % (callno))
         self.normalized = normalize(callno)
 
     def __unicode__(self):
