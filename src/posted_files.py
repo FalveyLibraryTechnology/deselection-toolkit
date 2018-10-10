@@ -1,26 +1,21 @@
+import sqlite3
 from xlrd import open_workbook  # Excel files
 from typing import Dict, Optional
 
 from .utils import normalize_callnumber
 
-SECTIONS = ["DAW", "DJK", "BC", "BD", "BH", "BL", "BF", "BJ", "BM", "BP", "BQ", "BR", "BS", "BT", "BV", "BX",
-            "CB", "CC", "CD", "CE", "CJ", "CN", "CR", "CS", "CT",
-            "DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DJ", "DK", "DP", "DQ", "DR", "DS", "DT", "DU", "DX",
-            "GA", "GB", "GC", "GE", "GF", "GN", "GR", "GT", "GV",
-            "HA", "HB", "HC", "HD", "HE", "HF", "HG", "HM", "HN", "HQ", "HS", "HT", "HV", "HX",
-            "JA", "JC", "JF", "JJ", "JK", "JL", "JN", "JQ", "JS", "JV", "JX", "JZ",
-            "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LJ", "LT",
-            "NA", "NB", "NC", "ND", "NE", "NK", "NX", "TR",
-            "PA", "PE", "PB", "PC", "PD", "PF", "PG", "PH", "PJ", "PK", "PL", "PM", "PQ", "PN", "PR", "PS", "PT",
-            "QA", "QB", "QC", "QD", "QE", "QH", "QK", "QL", "QM", "QP", "QR",
-            "RA", "RB", "RC", "RD", "RE", "RF", "RG", "RJ", "RK", "RL", "RM", "RS", "RT", "RV", "RX", "RZ",
-            "SB", "SD", "SF", "SH", "SK",
-            "TA", "TC", "TD", "TE", "TF", "TG", "TH", "TJ", "TK", "TL", "TN", "TP", "TS", "TT", "TX",
-            "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "VA", "VB", "VC", "VD", "VE", "VF", "VG", "VK", "VM", "ZA",
-            "A", "Q", "S", "T", "J", "C", "D", "E", "F", "N", "Z", "H", "K", "G", "L", "U", "V", "B", "R", "M", "P"]
+SECTIONS = []
 
 
-def get_callnumber_section(callnumber: str) -> Optional[str]:
+def get_callnumber_section(callnumber: str, conn = None) -> Optional[str]:
+    global SECTIONS
+    if not SECTIONS:
+        if not conn:
+            conn = sqlite3.connect("database.sqlite")
+        conn.row_factory = lambda cursor, row: row[0]
+        cursor = conn.cursor()
+        cursor.execute("SELECT cn_section FROM librarian_assignments ORDER BY LENGTH(cn_section) DESC")
+        SECTIONS = cursor.fetchall()
     if not callnumber:
         raise ValueError("empty callnumber")
     for sec in SECTIONS:
@@ -29,7 +24,7 @@ def get_callnumber_section(callnumber: str) -> Optional[str]:
     raise ValueError("invalid callnumber: %s" % callnumber)
 
 
-def parse_source_file(filepath) -> Optional[Dict]:
+def parse_source_file(filepath, conn = None) -> Optional[Dict]:
     global SECTIONS
 
     # Get callnumber section
@@ -76,7 +71,7 @@ def parse_source_file(filepath) -> Optional[Dict]:
             book["callnumber_sort"] = normalize_callnumber(book["callnumber"])
             book["year"] = str(book["year"]).split(".")[0]
             try:
-                book["cn_section"] = get_callnumber_section(book["callnumber_sort"])
+                book["cn_section"] = get_callnumber_section(book["callnumber_sort"], conn if conn else None)
             except ValueError as e:
                 print(book)
             books.append(book)

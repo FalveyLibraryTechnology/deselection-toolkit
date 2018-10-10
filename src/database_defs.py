@@ -4,7 +4,7 @@ import os
 import sys
 
 from typing import Iterable, Tuple
-from sqlite3 import Connection
+from sqlite3 import Connection, IntegrityError
 
 from src.log_parsing import parse_request
 from src.posted_files import parse_source_file
@@ -50,13 +50,18 @@ def addNewPostedFiles(conn: Connection) -> None:
                         file_id = cursor.lastrowid
                         break
                 for book in file["books"]:
-                    cursor.execute(
-                        "INSERT INTO posted_books"
-                        " (barcode, callnumber, callnumber_sort, cn_section, title, author, pub_year, file_id)"
-                        " VALUES (?,?,?,?,?,?,?,?)",
-                        (int(book["barcode"]), book["callnumber"], book["callnumber_sort"], book["cn_section"],
-                         book["title"], book["author"], book["year"], file_id)
-                    )
+                    try:
+                        cursor.execute(
+                            "INSERT INTO posted_books"
+                            " (barcode, callnumber, callnumber_sort, cn_section, title, author, pub_year, file_id)"
+                            " VALUES (?,?,?,?,?,?,?,?)",
+                            (int(book["barcode"]), book["callnumber"], book["callnumber_sort"], book["cn_section"],
+                             book["title"], book["author"], book["year"], file_id)
+                        )
+                    except IntegrityError as e:
+                        print(e, book["barcode"])
+                    except KeyError as e:
+                        print("KeyError: %s" % e, book["callnumber"])
     conn.commit()
 
 

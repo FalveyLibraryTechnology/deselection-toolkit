@@ -10,6 +10,10 @@ import sys
 sys.path.append("..")
 from src.posted_files import parse_source_file
 
+if not os.path.exists("../database.sqlite"):
+    print("WTF")
+    exit(0)
+
 conn = sqlite3.connect("../database.sqlite")
 cursor = conn.cursor()
 
@@ -41,7 +45,7 @@ try:
         ws = wb.Sheets(1)
         ws.Name = "%s_updated" % ws.Name[0:32] # limit length
 
-        parsed_file = parse_source_file(os.path.abspath(stat.path))
+        parsed_file = parse_source_file(os.path.abspath(stat.path), conn)
         if parsed_file is None:
             continue
         remove = []
