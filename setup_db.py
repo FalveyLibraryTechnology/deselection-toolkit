@@ -23,7 +23,7 @@ conn.commit()
 def load_subjects() -> Dict:
     print("\nCreate subjects...")
     subjects = {}
-    for label in open("db_data/subject_list.txt", "r"):
+    for label in open("db_data/subject_list.txt", "r", encoding="utf-8"):
         cursor.execute("INSERT INTO subjects(label) VALUES (?);", (label,))
         print("\t%s: %d" % (label.strip(), cursor.lastrowid))
         subjects[label.strip()] = cursor.lastrowid
@@ -33,7 +33,7 @@ def load_subjects() -> Dict:
 
 def load_librarians() -> Dict:
     print("\nCreate librarians...")
-    librarians = json.load(open("db_data/librarians.json", "r"))  # librarian data by initial
+    librarians = json.load(open("db_data/librarians.json", "r", encoding="utf-8"))  # librarian data by initial
     for initials in librarians:
         cursor.execute("INSERT INTO librarians(initials, name) VALUES (?,?);", (initials, librarians[initials]["name"]))
         print("\t", librarians[initials]["name"], cursor.lastrowid)
@@ -52,7 +52,7 @@ def load_callnumbers(librarians, subjects) -> None:
     callnumber_counts = {}
     # Collection counts
     print("\tactive_callnumbers.txt")
-    all_callnumbers = open("db_data/active_callnumbers.txt").read().split("\n")
+    all_callnumbers = open("db_data/active_callnumbers.txt", encoding="utf-8").read().split("\n")
     index = 0
     bar = progressbar.ProgressBar(max_value=len(all_callnumbers))
     for cn in all_callnumbers:
@@ -70,7 +70,7 @@ def load_callnumbers(librarians, subjects) -> None:
     bar.finish()
     # Greenglass Recommendation counts
     print("\tgg_callnumbers.txt")
-    gg_callnumbers = open("db_data/gg_callnumbers.txt").read().split("\n")
+    gg_callnumbers = open("db_data/gg_callnumbers.txt", encoding="utf-8").read().split("\n")
     index = 0
     bar = progressbar.ProgressBar(max_value=len(gg_callnumbers))
     for cn in gg_callnumbers:
@@ -88,7 +88,7 @@ def load_callnumbers(librarians, subjects) -> None:
         index += 1
     gg_callnumbers = make_unique(gg_callnumbers)
     gg_callnumbers.sort()
-    open("db_data/gg_callnumbers_norm.txt", "w").write("\n".join(gg_callnumbers))
+    open("db_data/gg_callnumbers_norm.txt", "w", encoding="utf-8").write("\n".join(gg_callnumbers))
     del gg_callnumbers
     bar.finish()
 
@@ -125,7 +125,7 @@ def load_excluded_sets() -> None:
     excluded_files = os.listdir(excluded_path)
     for file in excluded_files:
         print("\t%s" % file)
-        lines = open(os.path.join(excluded_path, file), "r").read().split("\n")
+        lines = open(os.path.join(excluded_path, file), "r", encoding="utf-8").read().split("\n")
         reason = lines.pop(0).strip()
         lines = make_unique(lines)
         print("\t\t%s" % reason)
