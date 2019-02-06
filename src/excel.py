@@ -81,26 +81,28 @@ def excel_insert_column(filepath, output, column_index, data, start_row=0):
 '''
 
 
-def excel_get_column_by_regex(column_re, filepath):
+def get_excel_column_by_regex(column_re, filepath):
     rows = []
     pattern = re.compile(column_re)
     with open_workbook(filepath) as book:
         for s in range(book.nsheets):
             sheet = book.sheet_by_index(s)
-            books_columns = {}
+            columns = {}
             body = False
             row_index = 1
             for row in range(0, sheet.nrows):
                 rvalues = sheet.row_values(row)
                 if not body:
                     for col in rvalues:
-                        if pattern.search(col):
-                            books_columns[col] = rvalues.index(col)
+                        if not col:
+                            continue
+                        if pattern.search(str(col)):
+                            columns[col] = rvalues.index(col)
                             body = True
                 else:
                     row = {"_number": row_index}
-                    for col in books_columns:
-                        row[col] = rvalues[books_columns[col]]
+                    for col in columns:
+                        row[col] = rvalues[columns[col]]
                     rows.append(row)
                 row_index += 1
     return rows

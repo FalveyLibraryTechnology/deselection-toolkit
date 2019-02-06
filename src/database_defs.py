@@ -42,7 +42,7 @@ def addNewPostedFiles(conn: Connection) -> None:
                 file_id = -1
                 for lib in librarians:
                     if ("_%s_" % lib["initials"]) in file["name"]:
-                        month_date = datetime.datetime.strptime(month, "%B %Y")
+                        month_date = datetime.datetime.strptime(month, "%Y %B")
                         cursor.execute(
                             "INSERT INTO posted_files (name, librarian_id, month) VALUES (?,?,?)",
                             (file["name"], lib["id"], month_date)

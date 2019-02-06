@@ -33,9 +33,12 @@ def load_subjects() -> Dict:
 
 def load_librarians() -> Dict:
     print("\nCreate librarians...")
-    librarians = json.load(open("db_data/librarians.json", "r", encoding="utf-8"))  # librarian data by initial
+    # librarian data by initial
+    librarians = json.load(
+        open("db_data/librarians.json", "r", encoding="utf-8"))
     for initials in librarians:
-        cursor.execute("INSERT INTO librarians(initials, name) VALUES (?,?);", (initials, librarians[initials]["name"]))
+        cursor.execute("INSERT INTO librarians(initials, name) VALUES (?,?);",
+                       (initials, librarians[initials]["name"]))
         print("\t", librarians[initials]["name"], cursor.lastrowid)
         librarians[initials]["id"] = cursor.lastrowid
         for assignment in librarians[initials]["assignment"]:
@@ -50,9 +53,11 @@ def load_librarians() -> Dict:
 def load_callnumbers(librarians, subjects) -> None:
     print("\nCreate callnumbers...")
     callnumber_counts = {}
+
     # Collection counts
     print("\tactive_callnumbers.txt")
-    all_callnumbers = open("db_data/active_callnumbers.txt", encoding="utf-8").read().split("\n")
+    all_callnumbers = open("db_data/active_callnumbers.txt",
+                           encoding="utf-8").read().split("\n")
     index = 0
     bar = progressbar.ProgressBar(max_value=len(all_callnumbers))
     for cn in all_callnumbers:
@@ -68,32 +73,30 @@ def load_callnumbers(librarians, subjects) -> None:
         index += 1
     del all_callnumbers
     bar.finish()
-    # Greenglass Recommendation counts
-    print("\tgg_callnumbers.txt")
-    gg_callnumbers = open("db_data/gg_callnumbers.txt", encoding="utf-8").read().split("\n")
-    index = 0
+
+    # Normalize callnumbers
+    print("\tnormalize gg_callnumbers.txt")
+    gg_callnumbers = open("db_data/gg_callnumbers.txt",
+                          encoding="utf-8").read().split("\n")
     bar = progressbar.ProgressBar(max_value=len(gg_callnumbers))
+    index = 0
     for cn in gg_callnumbers:
-        try:
-            sec = get_callnumber_section(cn)
-            callnumber_counts[sec]["recommended"] += 1
-        except ValueError:
-            continue
-        try:
-            gg_callnumbers[index] = normalize_callnumber(cn)
-        except ValueError:
-            # print ("odd gg callnumber: %s" % cn)
-            pass
+        gg_callnumbers[index] = normalize_callnumber(cn)
         bar.update(index)
         index += 1
-    gg_callnumbers = make_unique(gg_callnumbers)
-    gg_callnumbers.sort()
-    open("db_data/gg_callnumbers_norm.txt", "w", encoding="utf-8").write("\n".join(gg_callnumbers))
-    del gg_callnumbers
     bar.finish()
+    open("db_data/gg_callnumbers_norm.txt", "w",
+         encoding="utf-8").write("\n".join(gg_callnumbers))
+    del gg_callnumbers
 
+    # Load GG counts
+    gg_counts = json.load(open("db_data/gg_section_counts.json", "r"))
+    for cn in gg_counts:
+        cn_section = get_callnumber_section(cn)
+        callnumber_counts[cn_section]["recommended"] += gg_counts[cn] if cn in gg_counts else 0
+
+    # Insert
     for cn_section in callnumber_counts:
-        # print(cn_section, callnumber_counts[cn_section])
         subject_id = -1
         assigned_to = -1
         for initials in librarians:
@@ -105,12 +108,14 @@ def load_callnumbers(librarians, subjects) -> None:
             print("missing", cn_section)
             break
         section = callnumber_counts[cn_section]
-        if section["collection"] < section["recommended"]: # GG counts may be higher due to collection changes
+        # GG counts may be higher due to collection changes
+        if section["collection"] < section["recommended"]:
             section["collection"] = section["recommended"]
         cursor.execute(
             "INSERT INTO callnumber_sections"
             "(cn_section, collection_count, gg_recommended, reviewed_count, librarian_id) VALUES (?,?,?,?,?);",
-            (cn_section, section["collection"], section["recommended"], 0, assigned_to)
+            (cn_section, section["collection"],
+             section["recommended"], 0, assigned_to)
         )
         cursor.execute(
             "INSERT INTO sections_subjects(cn_section, subject_id) VALUES (?,?);",
@@ -125,15 +130,18 @@ def load_excluded_sets() -> None:
     excluded_files = os.listdir(excluded_path)
     for file in excluded_files:
         print("\t%s" % file)
-        lines = open(os.path.join(excluded_path, file), "r", encoding="utf-8").read().split("\n")
+        lines = open(os.path.join(excluded_path, file), "r",
+                     encoding="utf-8").read().split("\n")
         reason = lines.pop(0).strip()
         lines = make_unique(lines)
         print("\t\t%s" % reason)
-        cursor.execute("INSERT INTO excluded_sets (reason) VALUES (?)", (reason,))
+        cursor.execute(
+            "INSERT INTO excluded_sets (reason) VALUES (?)", (reason,))
         set_id = cursor.lastrowid
         for barcode in lines:
             barcode = barcode.strip()
-            cursor.execute("INSERT INTO excluded_barcodes (barcode, set_id) VALUES (?,?)", (barcode, set_id))
+            cursor.execute(
+                "INSERT INTO excluded_barcodes (barcode, set_id) VALUES (?,?)", (barcode, set_id))
     conn.commit()
 
 

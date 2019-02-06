@@ -19,7 +19,7 @@ def write_csv_file(filename: str, month_dir: str, columns: List[str], data: List
 def query_all_faculty_requests(file_month: datetime) -> List[Tuple]:
     where_conjunction = "AND" if file_month else "OR"  # OR for all months
     cursor.execute("""
-        SELECT posted_books.barcode, posted_books.callnumber, posted_books.title, posted_books.author, 
+        SELECT posted_books.barcode, posted_books.callnumber, posted_books.title, posted_books.author,
                posted_books.pub_year, faculty.name, faculty_books.personal, faculty_requests.date
             FROM posted_books
             INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
@@ -35,7 +35,7 @@ def query_all_faculty_requests(file_month: datetime) -> List[Tuple]:
 def query_faculty_effective(file_month: datetime) -> List[Tuple]:
     where_conj = "AND" if file_month else "OR"  # OR for all months
     cursor.execute("""
-        SELECT posted_books.barcode, posted_books.callnumber, posted_books.title, posted_books.author, 
+        SELECT posted_books.barcode, posted_books.callnumber, posted_books.title, posted_books.author,
                posted_books.pub_year, faculty.name, faculty_books.personal
             FROM posted_books
             INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
@@ -52,7 +52,7 @@ def query_faculty_effective(file_month: datetime) -> List[Tuple]:
 def query_for_personal_effective(file_month: datetime) -> List[Tuple]:
     where_conjunction = "AND" if file_month else "OR"  # OR for all months
     cursor.execute("""
-        SELECT posted_books.callnumber, faculty.name, faculty.address, posted_books.title, posted_books.author, 
+        SELECT posted_books.callnumber, faculty.name, faculty.address, posted_books.title, posted_books.author,
                posted_books.pub_year, posted_books.barcode
             FROM posted_books
             INNER JOIN faculty_books ON faculty_books.barcode = posted_books.barcode
@@ -69,7 +69,7 @@ def query_for_personal_effective(file_month: datetime) -> List[Tuple]:
 
 def query_master_list(file_month: datetime) -> List[Tuple]:
     cursor.execute("""
-        SELECT posted_books.callnumber, posted_books.title, posted_books.author, posted_books.pub_year, 
+        SELECT posted_books.callnumber, posted_books.title, posted_books.author, posted_books.pub_year,
                posted_books.barcode
             FROM posted_books
             INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
@@ -81,7 +81,7 @@ def query_master_list(file_month: datetime) -> List[Tuple]:
 
 def query_subject_counts() -> List[Tuple]:
     cursor.execute("""
-        SELECT subjects.label, SUM(callnumber_sections.collection_count), SUM(callnumber_sections.gg_recommended), 
+        SELECT subjects.label, SUM(callnumber_sections.collection_count), SUM(callnumber_sections.gg_recommended),
                SUM(callnumber_sections.reviewed_count)
             FROM subjects
             INNER JOIN sections_subjects ON sections_subjects.subject_id = subjects.subject_id
@@ -163,31 +163,34 @@ def get_cumulative_personal_bysection() -> Dict[str, int]:
     return counts
 
 
-def generate_reports_for_period(folder: str, query_date: datetime) -> None:
-    if not os.path.exists("db_reports/%s/" % folder):
-        os.mkdir("db_reports/%s/" % folder)
+def generate_reports_for_period(out_folder: str, query_date: datetime) -> None:
+    if not os.path.exists("db_reports/%s/" % out_folder):
+        os.mkdir("db_reports/%s/" % out_folder)
     # Faculty All Requests
     write_csv_file(
-        "faculty-all-requests.csv", folder,
-        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal", "Request Date"],
+        "faculty-all-requests.csv", out_folder,
+        ["Barcode", "Callnumber", "Title", "Author", "Publish Year",
+            "Faculty Name", "Personal", "Request Date"],
         query_all_faculty_requests(query_date)
     )
     # Faculty Effective
     write_csv_file(
-        "faculty-effective-requests.csv", folder,
-        ["Barcode", "Callnumber", "Title", "Author", "Publish Year", "Faculty Name", "Personal"],
+        "faculty-effective-requests.csv", out_folder,
+        ["Barcode", "Callnumber", "Title", "Author",
+            "Publish Year", "Faculty Name", "Personal"],
         query_faculty_effective(query_date)
     )
     # Personal Retention Effective
     write_csv_file(
-        "faculty-requests-for-personal-collections.csv", folder,
-        ["Callnumber", "Faculty Name", "Faculty Address", "Title", "Author", "Publish Year", "Barcode"],
+        "faculty-requests-for-personal-collections.csv", out_folder,
+        ["Callnumber", "Faculty Name", "Faculty Address",
+            "Title", "Author", "Publish Year", "Barcode"],
         query_for_personal_effective(query_date)
     )
     if query_date is not None:
         # Master Pull List
         write_csv_file(
-            "master-pull-list.csv", folder,
+            "master-pull-list.csv", out_folder,
             ["Callnumber", "Title", "Author", "Publish Year", "Barcode"],
             query_master_list(query_date)
         )
@@ -202,7 +205,8 @@ def create_collection_review() -> None:
         label, collection_count, gg_recommended, reviewed_count = subject
         collection_total += collection_count
 
-    outfile = open("db_reports/collection_review.csv", "w", encoding="utf-8")
+    outfile = open(
+        "db_reports/Cumulative/collection_progress_review.csv", "w", encoding="utf-8")
     book_counts = query_subject_book_counts()
     as_of = datetime.datetime.strftime(datetime.datetime.now(), "%m/%d")
     outfile.write("Print Monograph Collection Review\n"
@@ -219,11 +223,13 @@ def create_collection_review() -> None:
         label, collection_count, gg_recommended, reviewed_count = subject
         label, posted_counts, faculty_count = book_counts[index]
         librarian_retained = reviewed_count - posted_counts
+
         outfile.write(
             "%s,%d,%.5f,,,%d,%.5f,,%d,%.5f,%d,%.5f\n" % (
                 label.strip(), collection_count, collection_count / collection_total,
                 gg_recommended, gg_recommended / collection_count,
-                reviewed_count, reviewed_count / gg_recommended, librarian_retained, librarian_retained / reviewed_count
+                reviewed_count, reviewed_count /
+                gg_recommended, librarian_retained, librarian_retained / reviewed_count
             )
         )
         index += 1
@@ -243,9 +249,11 @@ def create_collection_review() -> None:
         outfile.write(
             "%s,%d,%.5f,,,%d,%d,,%.5f\n" % (
                 label.strip(), collection_count, collection_count / collection_total,
-                collection_count - (gg_recommended - librarian_retained - faculty_count),
+                collection_count - (gg_recommended -
+                                    librarian_retained - faculty_count),
                 gg_recommended - reviewed_count,
-                (collection_count - (gg_recommended - librarian_retained - faculty_count)) / collection_count,
+                (collection_count - (gg_recommended -
+                                     librarian_retained - faculty_count)) / collection_count,
             )
         )
         index += 1
@@ -265,16 +273,23 @@ def progress_by_callnumber_section() -> None:
         collection_total += collection_count
         gg_rec_total += gg_recommended
 
+    librarian_reviewed_total = 0
+    posted_total = 0
+
     cn_section_rows = []
-    missing_book_counts = 0
+    missing_books_count = 0
     for index in range(len(section_counts)):
         label, collection_count, gg_recommended, reviewed_count = section_counts[index]
-        bc_label, posted_counts = book_counts[index - missing_book_counts]
+        bc_label, posted_counts = book_counts[index - missing_books_count]
         if label != bc_label:
             posted_counts = 0
-            missing_book_counts += 1
+            missing_books_count += 1
         faculty_count = faculty_counts[label] if label in faculty_counts else 0
         personal_count = personal_counts[label] if label in personal_counts else 0
+        reviewed_percent = reviewed_count / gg_recommended if gg_recommended > 0 else 0
+        if reviewed_percent > .95:
+            reviewed_percent = 1
+            reviewed_count = gg_recommended
         cn_section_rows.append((
             label,  # section
             collection_count,  # items in collection
@@ -282,17 +297,32 @@ def progress_by_callnumber_section() -> None:
             gg_recommended,  # items recommended
             gg_recommended / collection_count,  # percentage of collection recommended
             reviewed_count,  # items reviews by librarians
-            reviewed_count / gg_recommended if gg_recommended > 0 else 0,  # percentage of gg librarian reviewed
-            reviewed_count - posted_counts,  # items retained by staff
-            ((reviewed_count - posted_counts) / gg_recommended) if gg_recommended > 0 else 0,  # % librarian retained
+            reviewed_percent,  # percentage of gg librarian reviewed
+            reviewed_count - posted_counts,  # items retained by library staff
+            ((reviewed_count - posted_counts) / \
+             gg_recommended) if gg_recommended > 0 else 0,  # % librarian retained
             posted_counts,  # items posted to faculty
             faculty_count,  # items retained in collection by faculty
             personal_count,  # faculty personal collections
-            (faculty_count / posted_counts) if posted_counts > 0 else "",  # percentage of posted retained by faculty
-            (faculty_count / gg_recommended) if posted_counts > 0 else 0  # percentage of recommended faculty retained
+            # percentage of posted retained by faculty
+            (faculty_count / posted_counts) if posted_counts > 0 else "",
+            # percentage of recommended faculty retained
+            (faculty_count / gg_recommended) if posted_counts > 0 else 0
         ))
+        librarian_reviewed_total += reviewed_count
+        posted_total += posted_counts
+
+    print("Greenglass Recommended: %d" % gg_rec_total)
+    print("~Faculty Reviewed: %d" % librarian_reviewed_total)
+    print("~Faculty Retained: %d" % (librarian_reviewed_total - posted_total))
+    print("~Calculated Posted Total: %d" % (gg_rec_total -
+                                            librarian_reviewed_total - (librarian_reviewed_total - posted_total)))
+    print("Actual Posted Total: %d" % posted_total)
+    print("error: %d" % (posted_total - (gg_rec_total -
+                                         librarian_reviewed_total - (librarian_reviewed_total - posted_total))))
+
     write_csv_file(
-        "callnumber_section_stats.csv", ".",
+        "callnumber_section_stats.csv", "Cumulative",
         ["Callnumber Section", "# of Items in Collection", "Percentage of Collection",
          "# of Items Recommended for Removal by Greenglass", "% of Collection Quantitatively Recommended For Removal",
          "# of Items Reviewed By Library Staff", "% of Recommendations Reviewed To Date (Progress)",
@@ -305,11 +335,12 @@ def progress_by_callnumber_section() -> None:
 
 
 print("Create Monthly Data Reports...")
-months = [dir_.path.split("/")[1] for dir_ in os.scandir("sources/") if dir_.is_dir()]
+months = [dir_.path.split("/")[1]
+          for dir_ in os.scandir("sources/") if dir_.is_dir()]
 for month in months:
     print("\t%s" % month)
-    month_date = datetime.datetime.strptime(month, "%B %Y")
-    generate_reports_for_period(month, month_date)
+    month_date = datetime.datetime.strptime(month, "%Y %B")
+    generate_reports_for_period(month_date.strftime("%B %Y"), month_date)
 
 print("Create Cumulative Reports...")
 generate_reports_for_period("Cumulative", None)
