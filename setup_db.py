@@ -92,7 +92,11 @@ def load_callnumbers(librarians, subjects) -> None:
     # Load GG counts
     gg_counts = json.load(open("db_data/gg_section_counts.json", "r"))
     for cn in gg_counts:
-        cn_section = get_callnumber_section(cn)
+        cn_section = cn
+        try:
+            cn_section = get_callnumber_section(cn)
+        except:
+            continue
         callnumber_counts[cn_section]["recommended"] += gg_counts[cn] if cn in gg_counts else 0
 
     # Insert
