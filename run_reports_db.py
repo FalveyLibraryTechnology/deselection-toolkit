@@ -75,6 +75,7 @@ def query_master_list(file_month: datetime) -> List[Tuple]:
             INNER JOIN posted_files ON posted_files.file_id = posted_books.file_id
             WHERE posted_files.month = ?
                 AND NOT EXISTS(SELECT 1 FROM faculty_books WHERE barcode = posted_books.barcode)
+                AND barcode NOT IN (SELECT barcode FROM excluded_barcodes)
             ORDER BY posted_books.callnumber_sort ASC""", (file_month,))
     return cursor.fetchall()
 
@@ -335,6 +336,8 @@ def progress_by_callnumber_section() -> None:
 
 
 print("Create Monthly Data Reports...")
+if not os.path.exists("db_reports/"):
+    os.mkdir("db_reports/")
 months = [dir_.path.split("/")[1]
           for dir_ in os.scandir("sources/") if dir_.is_dir()]
 for month in months:
