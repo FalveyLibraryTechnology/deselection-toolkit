@@ -1,3 +1,13 @@
+## This project has undergone a major refactoring
+
+This project was migrated to a database system in 2018. Unfortunately, that makes most of these scripts are more customized than may be useful for an open-source project. Just be aware as you look through this code that much of it will have to be adapted to your libraries case.
+
+More information on the database's structure and SQL versions of the reports will be posted soon.
+
+[Updated 2019-02-21]
+
+------
+
 # deselection-toolkit
 
 > Villanova's Collection Review Toolkit
