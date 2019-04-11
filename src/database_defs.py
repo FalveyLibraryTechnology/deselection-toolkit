@@ -59,7 +59,8 @@ def addNewPostedFiles(conn: Connection) -> None:
                              book["title"], book["author"], book["year"], file_id)
                         )
                     except IntegrityError as e:
-                        print(e, book["barcode"])
+                        if str(e)[0:6] != "UNIQUE":
+                            print(e, book["barcode"])
                     except KeyError as e:
                         print("KeyError: %s" % e, book["callnumber"])
     conn.commit()
