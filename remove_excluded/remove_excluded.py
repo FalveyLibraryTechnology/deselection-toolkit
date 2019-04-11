@@ -47,7 +47,15 @@ def filter_folder(in_dir, out_dir):
             ws = wb.Sheets(1)
             # ws.Name = ("%s_updated" % ws.Name)[0:32] # limit length
 
+            parsed_file = None
             parsed_file = parse_source_file(os.path.abspath(stat.path), conn)
+            '''
+            try:
+                parsed_file = parse_source_file(os.path.abspath(stat.path), conn)
+            except ValueError as e:
+                print(e)
+                continue
+            '''
             if parsed_file is None:
                 continue
             remove = []
@@ -90,6 +98,19 @@ def filter_folder(in_dir, out_dir):
 
 
 filter_folder("src", "./out")
+'''
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 February/Including checked out items/", "./out/2018 February")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 March/Including checked out items/", "./out/2018 March")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 April/Including checked out items/", "./out/2018 April")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 May/Including checked out items/", "./out/2018 May")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 September/Including checked out items/", "./out/2018 September")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 October/Including checked out items/", "./out/2018 October")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 November/Including checked out items/", "./out/2018 November")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2018 December/Including checked out items/", "./out/2018 December")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2019 January/Including checked out items/", "./out/2019 January")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2019 February/Including checked out items/", "./out/2019 February")
+filter_folder("../../../../Dropbox (Villanova)/Collection Review Task Force - Public/Archived/2019 March/Including checked out items/", "./out/2019 March")
+'''
 '''
 filter_folder("../sources/2018 February", "./out/2018 February")
 filter_folder("../sources/2018 March", "./out/2018 March")

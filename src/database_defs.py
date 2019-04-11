@@ -69,6 +69,9 @@ def addNewRequests(conn: Connection) -> None:
     print("\nUpdating Faculty Requests...")
     cursor = conn.cursor()
 
+    # Set aside PR books for now
+    valid_pr_set = set(open("db_data/pr_google_list.txt", newline="", encoding="utf-8").read().split("\n"))
+
     file = csv.reader(open("db_data/faculty_requests.csv", encoding="utf-8"))
     form_rows = []
     header = True
@@ -118,7 +121,10 @@ def addNewRequests(conn: Connection) -> None:
             # Make sure book is a posted book
             cursor.execute("SELECT 1 FROM posted_books WHERE barcode=?", (book["barcode"],))
             if cursor.fetchone() is None:
-                print("\tinvalid barcode: %s (%s)" % (book["barcode"], request["date"]))
+                # Make sure this book isn't excluded
+                cursor.execute("SELECT 1 FROM excluded_barcodes WHERE barcode=?", (book["barcode"],))
+                if cursor.fetchone() is None and str(book["barcode"]) not in valid_pr_set:
+                    print("\tinvalid barcode: %s (%s)" % (book["barcode"], request["date"]))
                 continue
             # Add new items
             cursor.execute("SELECT 1 FROM faculty_books WHERE barcode=?", (book["barcode"],))
