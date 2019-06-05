@@ -3,6 +3,7 @@ import datetime
 import os
 import sqlite3
 
+from operator import add
 from typing import Dict, List, Tuple
 
 conn = sqlite3.connect("database.sqlite")
@@ -210,39 +211,15 @@ def create_collection_review() -> None:
         "db_reports/Cumulative/collection_progress_review.csv", "w", encoding="utf-8")
     book_counts = query_subject_book_counts()
     as_of = datetime.datetime.strftime(datetime.datetime.now(), "%m/%d")
-    outfile.write("Print Monograph Collection Review\n"
-                  "Subject Area,# of Items in Subject Area,% of Total Collection,"
-                  "% of Total Monograph Collection (print & electonic),,"
-                  '# of Items in Subject Area Identified for Review by Greenglass,'
-                  "% of Subject Area Identified for Review by Greenglass,,"
-                  "# of Items Reviewed In Subject Area (as of %s),"
-                  "%% of Identified Items Reviewed in Subject Area (as of %s),"
-                  "# of Reviewed Items Retained by Librarians (as of %s),"
-                  "%% of Reviewed Items Retained by Librarians\n".format(as_of, as_of, as_of))
-    index = 0
-    for subject in subject_counts:
-        label, collection_count, gg_recommended, reviewed_count = subject
-        label, posted_counts, faculty_count = book_counts[index]
-        librarian_retained = reviewed_count - posted_counts
-
-        outfile.write(
-            "%s,%d,%.5f,,,%d,%.5f,,%d,%.5f,%d,%.5f\n" % (
-                label.strip(), collection_count, collection_count / collection_total,
-                gg_recommended, gg_recommended / collection_count,
-                reviewed_count, reviewed_count /
-                gg_recommended, librarian_retained, librarian_retained / reviewed_count
-            )
-        )
-        index += 1
-        outfile.write("\n\n\n")
-        outfile.write("Subject Area,# of Items in Subject Area,"
-                      "% of Total Collection,"
-                      "% of Total Monograph Collection (print & electonic),,"
-                      "# of Items in Subject Area to be Retained (as of %s),"
-                      "# of Items in Subject Area Remaining to be Reviewed (as of %s),,"
-                      "%% of Items in Subject Area to be Retained (as of %s)\n".format(as_of, as_of, as_of))
+    outfile.write("Subject Area,# of Items in Subject Area,"
+                  "%% of Total Collection,"
+                  "%% of Total Monograph Collection (print & electonic),,"
+                  "# of Items in Subject Area to be Retained (as of %s),"
+                  "# of Items in Subject Area Remaining to be Reviewed (as of %s),,"
+                  "%% of Items in Subject Area to be Retained (as of %s)\n" % (as_of, as_of, as_of))
 
     index = 0
+    sums = [0, 0, 0, 0, 0]
     for subject in subject_counts:
         label, collection_count, gg_recommended, reviewed_count = subject
         label, posted_counts, faculty_count = book_counts[index]
@@ -257,7 +234,16 @@ def create_collection_review() -> None:
                                      librarian_retained - faculty_count)) / collection_count,
             )
         )
+        sums = list(map(add, sums, [
+            collection_count, collection_count / collection_total,
+            collection_count - (gg_recommended -
+                                librarian_retained - faculty_count),
+            gg_recommended - reviewed_count,
+            (collection_count - (gg_recommended -
+                                 librarian_retained - faculty_count)) / collection_count,
+        ]))
         index += 1
+    outfile.write("Total,%d,%.5f,,,%d,%d,,%.5f\n" % tuple(sums))
 
 
 def progress_by_callnumber_section() -> None:
@@ -314,13 +300,16 @@ def progress_by_callnumber_section() -> None:
         posted_total += posted_counts
 
     print("Greenglass Recommended: %d" % gg_rec_total)
-    print("~Faculty Reviewed: %d" % librarian_reviewed_total)
-    print("~Faculty Retained: %d" % (librarian_reviewed_total - posted_total))
+    print("~Staff Reviewed: %d (%.2f%% done)" % (librarian_reviewed_total, 100 * librarian_reviewed_total / gg_rec_total))
+    staff_retained = librarian_reviewed_total - posted_total
+    print(" Actual Posted Total: %d" % posted_total)
+    print("~Staff Retained: %d (%.2f%%)" % (staff_retained, 100 * staff_retained / librarian_reviewed_total))
+    '''
     print("~Calculated Posted Total: %d" % (gg_rec_total -
                                             librarian_reviewed_total - (librarian_reviewed_total - posted_total)))
-    print("Actual Posted Total: %d" % posted_total)
     print("error: %d" % (posted_total - (gg_rec_total -
                                          librarian_reviewed_total - (librarian_reviewed_total - posted_total))))
+    '''
 
     write_csv_file(
         "callnumber_section_stats.csv", "Cumulative",

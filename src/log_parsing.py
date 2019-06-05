@@ -41,6 +41,10 @@ def parse_request(row):
         blines = bt.split('\n')
         barcode = blines[0].strip()
 
+        while blines[bc] != 'Title:':
+            bc += 1
+        title = blines[bc + 1].strip()
+
         while blines[bc] != 'Destination:':
             bc += 1
         personal = blines[bc + 1].strip() == 'Patron'
@@ -51,6 +55,7 @@ def parse_request(row):
 
         request["books"].append({
             "barcode": barcode,
+            "title": title,
             "personal": personal,
             "comment": comment
         })

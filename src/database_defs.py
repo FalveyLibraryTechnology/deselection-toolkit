@@ -76,11 +76,21 @@ def addNewRequests(conn: Connection) -> None:
     file = csv.reader(open("db_data/faculty_requests.csv", encoding="utf-8"))
     form_rows = []
     header = True
+    prev_for_error = None
     for row in file:
         if header:  # skip header
             header = False
             continue
+        try:
+          datetime.datetime.strptime(row[0], "%b %d, %Y, %I:%M:%S %p")
+        except:
+          print("Invalid date")
+          print(row)
+          print("prev")
+          print(prev_for_error)
+          exit(1)
         form_rows.append(row)
+        prev_for_error = row
     # Sort by date
     form_rows.sort(key=lambda r: datetime.datetime.strptime(r[0], "%b %d, %Y, %I:%M:%S %p"))
     for row in form_rows:
@@ -111,14 +121,6 @@ def addNewRequests(conn: Connection) -> None:
             request_id = cursor.lastrowid
         included_barcodes = []
         for book in request["books"]:
-            # Duplicate barcode in same request
-            if book["barcode"] in included_barcodes:
-                cursor.execute("SELECT posted_files.name FROM posted_files"
-                               " INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id"
-                               " WHERE posted_books.barcode=?", (book["barcode"],))
-                file_obj = cursor.fetchone()
-                print("\tduplicate in this request: %s (%s)" % (book["barcode"], file_obj[0]))
-                continue
             # Make sure book is a posted book
             cursor.execute("SELECT 1 FROM posted_books WHERE barcode=?", (book["barcode"],))
             if cursor.fetchone() is None:
@@ -127,8 +129,16 @@ def addNewRequests(conn: Connection) -> None:
                 if cursor.fetchone() is None and str(book["barcode"]) not in valid_pr_set:
                     print("\tinvalid barcode: %s (%s)" % (book["barcode"], request["date"]))
                 continue
+            # Duplicate barcode in same request
+            if book["barcode"] in included_barcodes:
+                cursor.execute("SELECT posted_files.name FROM posted_files"
+                               " INNER JOIN posted_books ON posted_books.file_id = posted_files.file_id"
+                               " WHERE posted_books.barcode=?", (book["barcode"],))
+                file_obj = cursor.fetchone()
+                print("\tduplicate in this request: %s (%s)" % (book["barcode"], file_obj[0] if file_obj else "n/a"))
+                continue
             # Add new items
-            cursor.execute("SELECT 1 FROM faculty_books WHERE barcode=?", (book["barcode"],))
+            cursor.execute("SELECT 1 FROM faculty_books WHERE barcode=? AND request_id=?", (book["barcode"], request_id))
             if cursor.fetchone() is None:
                 cursor.execute(
                     "INSERT INTO faculty_books(barcode, personal, comment, request_id) VALUES (?,?,?,?);",
